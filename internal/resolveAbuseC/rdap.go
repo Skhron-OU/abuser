@@ -28,6 +28,9 @@ func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
 	if len(*abuseContacts) == 0 {
 		for _, entity := range *entities {
 			mailboxCollector(abuseContacts, entity.VCard.Properties)
+			for _, entityChild := range entity.Entities {
+				mailboxCollector(abuseContacts, entityChild.VCard.Properties)
+			}
 		}
 	}
 }
