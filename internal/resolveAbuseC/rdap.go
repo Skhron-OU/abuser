@@ -22,6 +22,11 @@ func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
 			mailboxCollector(abuseContacts, entity.VCard.Properties)
 			break /* only one abuse contact can be attached */
 		}
+		for _, entityChild := range entity.Entities {
+			if utils.Index(entityChild.Roles, "abuse") != -1 {
+				mailboxCollector(abuseContacts, entityChild.VCard.Properties)
+			}
+		}
 	}
 
 	/* fallback: if there is no abuse-mailbox available, then return available emails */
