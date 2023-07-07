@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -80,10 +81,8 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 
 	for _, item := range parsedBody {
 		// resolve abuse contacts
-		resource.Resource = item.Source.ASN
-		abuseContacts = resource.ResolveAbuseContactByRIPEstat()
-		resource.Resource = item.Source.Ip
-		abuseContacts = append(abuseContacts, resource.ResolveAbuseContactByRIPEstat()...)
+		abuseContacts = resolveAbuseC.ForAsnByRDAP(item.Source.ASN)
+		abuseContacts = append(abuseContacts, resolveAbuseC.ForIpByRDAP(netip.MustParseAddr(item.Source.Ip))...)
 
 		if len(abuseContacts) == 0 { /* generic fallback, available for IPv4 only */
 			abuseContacts = append(abuseContacts, resource.ResolveAbuseContactByAbusix()...)
