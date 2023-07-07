@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/smtp"
+	"strings"
 )
 
 type SMTP struct {
@@ -27,15 +28,6 @@ type Email struct {
 }
 
 func (email *Email) Send(creds SMTP) {
-	// smtp_helo := os.Getenv("SMTP_HELO")
-	// if len(smtp_helo) == 0 {
-	// 	smtp_helo = "dummy.encryp.ch"
-	// }
-
-	// smtp_host := os.Getenv("SMTP_HOSTNAME")
-	// smtp_user := os.Getenv("SMTP_USERNAME")
-	// smtp_pass := os.Getenv("SMTP_PASSWORD")
-
 	tlsConnonfig := &tls.Config{
 		InsecureSkipVerify: false,
 		ServerName:         creds.Host,
@@ -75,9 +67,9 @@ func (email *Email) Send(creds SMTP) {
 	// create the letter in an appropriate format by combining headers and body into single string
 	rawEmail := ""
 	for k, v := range email.Headers {
-		rawEmail += fmt.Sprintf("%s: %s\r\n", k, v)
+		rawEmail += fmt.Sprintf("%s: %s\r\n", strings.TrimSpace(k), strings.TrimSpace(v))
 	}
-	rawEmail += "\r\n" + email.Body
+	rawEmail += "\r\n" + strings.TrimSpace(email.Body)
 
 	// send the letter to the SMTP server
 	_, err = w.Write([]byte(rawEmail))

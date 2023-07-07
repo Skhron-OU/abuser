@@ -93,8 +93,7 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		abuseContacts = utils.GetUnique(abuseContacts)
 
 		// template paremeters
-		tmplvar.Ip = item.Source.Ip
-		tmplvar.Events = nil
+		tmplvar = tmplvar_portscan{Ip: item.Source.Ip, Events: nil}
 
 		for _, event := range item.Events {
 			__event.Timestamp = event.Timestamp
@@ -121,13 +120,13 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		// BCC
 		email.EnvelopeTo = append(email.EnvelopeTo, email.EnvelopeFrom)
 
-		buf.Truncate(0)
+		buf.Reset()
 		err = tmpl_portscan_subject.Execute(buf, tmplvar)
 		utils.HandleCriticalError(err)
 		email.Headers["Subject"] = buf.String()
 
 		// TODO: fix timestamp length for proper tabulation
-		buf.Truncate(0)
+		buf.Reset()
 		err = tmpl_portscan_body.Execute(buf, tmplvar)
 		utils.HandleCriticalError(err)
 		email.Body = buf.String()
