@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strconv"
 )
 
 type RIRObject struct {
@@ -24,7 +23,7 @@ type apiResponse struct {
 	Status   string           `json:"status"`
 }
 
-func (o *RIRObject) ResolveAbuseContact() []string {
+func (o *RIRObject) ResolveAbuseContactByRIPEstat() []string {
 	param := make(map[string]string)
 	param["resource"] = o.Resource
 
@@ -34,11 +33,14 @@ func (o *RIRObject) ResolveAbuseContact() []string {
 	response_json, err := ioutil.ReadAll(response.Body)
 	response.Body.Close()
 
-	if response.StatusCode != 200 {
-		log.Fatalln("RIPEstat Data API error! HTTP status code: " + strconv.Itoa(response.StatusCode))
-	}
-
 	var response_api apiResponse
+
+	if response.StatusCode != 200 {
+		log.Printf("RIPEstat Data API error!\nHTTP status code: %d\nHTTP response body: %s\n",
+			response.StatusCode, response_json)
+		// this is to use fallback instead
+		return response_api.Data.Abuse_contacts
+	}
 
 	json.Unmarshal(response_json, &response_api)
 
