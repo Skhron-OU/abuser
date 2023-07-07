@@ -3,6 +3,7 @@ package resolveAbuseC
 import (
 	"abuser/internal/utils"
 	"fmt"
+	"log"
 	"net/netip"
 
 	"github.com/openrdap/rdap"
@@ -25,39 +26,38 @@ func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
 		for _, entityChild := range entity.Entities {
 			if utils.Index(entityChild.Roles, "abuse") != -1 {
 				mailboxCollector(abuseContacts, entityChild.VCard.Properties)
-			}
-		}
-	}
-
-	/* fallback: if there is no abuse-mailbox available, then return available emails */
-	if len(*abuseContacts) == 0 {
-		for _, entity := range *entities {
-			mailboxCollector(abuseContacts, entity.VCard.Properties)
-			for _, entityChild := range entity.Entities {
-				mailboxCollector(abuseContacts, entityChild.VCard.Properties)
+				break /* only one abuse contact can be attached */
 			}
 		}
 	}
 }
 
 func ForIpByRDAP(ip netip.Addr) []string {
-	client := &rdap.Client{}
-	ipMeta, _ := client.QueryIP(ip.String())
+	client := &rdap.Client{UserAgent: "SkhronAbuseComplainSender"}
+	ipMeta, err := client.QueryIP(ip.String())
 
 	var abuseContacts map[string]bool = make(map[string]bool, 0)
 
-	metaProcessor(&abuseContacts, &ipMeta.Entities)
+	if err == nil {
+		metaProcessor(&abuseContacts, &ipMeta.Entities)
+	} else {
+		log.Printf("ForIpByRDAP(%s) %s\n", ip.String(), err.Error())
+	}
 
 	return utils.Keys(abuseContacts)
 }
 
 func ForAsnByRDAP(asn string) []string {
-	client := &rdap.Client{}
-	asnMeta, _ := client.QueryAutnum(asn)
+	client := &rdap.Client{UserAgent: "SkhronAbuseComplainSender"}
+	asnMeta, err := client.QueryAutnum(asn)
 
 	var abuseContacts map[string]bool = make(map[string]bool, 0)
 
-	metaProcessor(&abuseContacts, &asnMeta.Entities)
+	if err == nil {
+		metaProcessor(&abuseContacts, &asnMeta.Entities)
+	} else {
+		log.Printf("ForAsnByRDAP(%s) %s\n", asn, err.Error())
+	}
 
 	return utils.Keys(abuseContacts)
 }

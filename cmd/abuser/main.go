@@ -84,6 +84,7 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		abuseContacts = resolveAbuseC.ForAsnByRDAP(item.Source.ASN)
 		abuseContacts = append(abuseContacts, resolveAbuseC.ForIpByRDAP(netip.MustParseAddr(item.Source.Ip))...)
 
+		resource.Resource = item.Source.Ip
 		if len(abuseContacts) == 0 { /* generic fallback, available for IPv4 only */
 			abuseContacts = append(abuseContacts, resource.ResolveAbuseContactByAbusix()...)
 		}
@@ -116,8 +117,8 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		email.EnvelopeTo = abuseContacts
 		email.Headers["To"] = strings.Join(abuseContacts, ", ")
 
-		// BCC
-		email.EnvelopeTo = append(email.EnvelopeTo, email.EnvelopeFrom)
+		// TODO: option to toggle BCC
+		//email.EnvelopeTo = append(email.EnvelopeTo, email.EnvelopeFrom)
 
 		buf.Reset()
 		err = tmpl_portscan_subject.Execute(buf, tmplvar)
