@@ -4,6 +4,7 @@ import (
 	"abuser/internal/utils"
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net/smtp"
 	"strings"
 )
@@ -55,29 +56,37 @@ func (email *Email) Send(creds SMTP) {
 	utils.HandleCriticalError(err)
 
 	// acknowledge who are the recipients for SMTP server
+	recipientCount := len(email.EnvelopeTo)
 	for _, recipient := range email.EnvelopeTo {
 		err = smtpConn.Rcpt(recipient)
+		if err != nil {
+			log.Printf("Invalid recipient: %s\n", err.Error())
+			recipientCount--
+		}
+	}
+
+	if recipientCount >= 1 {
+		// ask the SMTP server to receive our letter
+		w, err := smtpConn.Data()
 		utils.HandleCriticalError(err)
+
+		// create the letter in an appropriate format by combining headers and body into single string
+		rawEmail := ""
+		for k, v := range email.Headers {
+			rawEmail += fmt.Sprintf("%s: %s\r\n", strings.TrimSpace(k), strings.TrimSpace(v))
+		}
+		rawEmail += "\r\n" + strings.TrimSpace(email.Body)
+
+		// send the letter to the SMTP server
+		_, err = w.Write([]byte(rawEmail))
+		utils.HandleCriticalError(err)
+
+		// appropriately acknowledge the end of the letter
+		err = w.Close()
+		utils.HandleCriticalError(err)
+	} else {
+		log.Println("The letter has no valid recipients")
 	}
-
-	// ask the SMTP server to receive our letter
-	w, err := smtpConn.Data()
-	utils.HandleCriticalError(err)
-
-	// create the letter in an appropriate format by combining headers and body into single string
-	rawEmail := ""
-	for k, v := range email.Headers {
-		rawEmail += fmt.Sprintf("%s: %s\r\n", strings.TrimSpace(k), strings.TrimSpace(v))
-	}
-	rawEmail += "\r\n" + strings.TrimSpace(email.Body)
-
-	// send the letter to the SMTP server
-	_, err = w.Write([]byte(rawEmail))
-	utils.HandleCriticalError(err)
-
-	// appropriately acknowledge the end of the letter
-	err = w.Close()
-	utils.HandleCriticalError(err)
 
 	// appropriately end our communication with the server
 	smtpConn.Quit()
