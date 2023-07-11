@@ -25,15 +25,17 @@ func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactType
 	var emailType string
 
 	// process root Entity
-	if contactType == "abuse" { /* strict check */
-		emailType = contactType
-		if utils.Index(entity.Roles, contactType) != -1 {
+	if entity.VCard != nil {
+		if contactType == "abuse" { /* strict check */
+			emailType = contactType
+			if utils.Index(entity.Roles, contactType) != -1 {
+				mailboxCollector(abuseContacts, entity.VCard.Properties, emailType)
+				return
+			}
+		} else { /* fallback mode, gather all available emails */
+			emailType = typeAny
 			mailboxCollector(abuseContacts, entity.VCard.Properties, emailType)
-			return
 		}
-	} else { /* fallback mode, gather all available emails */
-		emailType = typeAny
-		mailboxCollector(abuseContacts, entity.VCard.Properties, emailType)
 	}
 
 	// process child Entities if any
