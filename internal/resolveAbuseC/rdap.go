@@ -9,25 +9,47 @@ import (
 	"github.com/openrdap/rdap"
 )
 
-func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardProperty) {
+const typeAny = "*any*"
+
+func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardProperty, emailType string) {
 	for _, property := range props {
 		if property.Name == "email" && property.Type == "text" {
-			(*abuseContacts)[fmt.Sprint(property.Value)] = true
+			if emailType == typeAny || utils.Index(property.Parameters["type"], emailType) != -1 {
+				(*abuseContacts)[fmt.Sprint(property.Value)] = true
+			}
 		}
+	}
+}
+
+func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactType string) {
+	var emailType string
+
+	// process root Entity
+	if contactType == "abuse" { /* strict check */
+		emailType = contactType
+		if utils.Index(entity.Roles, contactType) != -1 {
+			mailboxCollector(abuseContacts, entity.VCard.Properties, emailType)
+			return
+		}
+	} else { /* fallback mode, gather all available emails */
+		emailType = typeAny
+		mailboxCollector(abuseContacts, entity.VCard.Properties, emailType)
+	}
+
+	// process child Entities if any
+	for _, entityChild := range entity.Entities {
+		loopEntity(abuseContacts, &entityChild, contactType)
 	}
 }
 
 func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
 	for _, entity := range *entities {
-		if utils.Index(entity.Roles, "abuse") != -1 {
-			mailboxCollector(abuseContacts, entity.VCard.Properties)
-			break /* only one abuse contact can be attached */
-		}
-		for _, entityChild := range entity.Entities {
-			if utils.Index(entityChild.Roles, "abuse") != -1 {
-				mailboxCollector(abuseContacts, entityChild.VCard.Properties)
-				break /* only one abuse contact can be attached */
-			}
+		loopEntity(abuseContacts, &entity, "abuse")
+	}
+
+	if len(*abuseContacts) == 0 {
+		for _, entity := range *entities {
+			loopEntity(abuseContacts, &entity, typeAny)
 		}
 	}
 }
