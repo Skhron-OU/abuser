@@ -31,13 +31,13 @@ func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactType
 
 	// process root Entity
 	if entity.VCard != nil {
-		if contactType == "abuse" {
-			emailType = contactType
-			if utils.Index(entity.Roles, contactType) != -1 {
-				mailboxCollector(abuseContacts, entity.VCard.Properties, emailType)
-				return
+		if contactType == "abuseMailbox" { /* no matter what entity role is, lookup abuse-mailbox */
+			mailboxCollector(abuseContacts, entity.VCard.Properties, "abuse")
+		} else if contactType == "abuseContact" { /* lookup all emails from entity with role of abuse */
+			if utils.Index(entity.Roles, "abuse") != -1 {
+				mailboxCollector(abuseContacts, entity.VCard.Properties, typeAny)
 			}
-		} else if len(*abuseContacts) == 0 { /* fallback mode, gather all available emails */
+		} else { /* fallback mode, gather all available emails */
 			emailType = typeAny
 			mailboxCollector(abuseContacts, entity.VCard.Properties, emailType)
 		}
@@ -46,7 +46,13 @@ func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactType
 
 func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
 	for _, entity := range *entities {
-		loopEntity(abuseContacts, &entity, "abuse")
+		loopEntity(abuseContacts, &entity, "abuseMailbox")
+	}
+
+	if len(*abuseContacts) == 0 {
+		for _, entity := range *entities {
+			loopEntity(abuseContacts, &entity, "abuseContact")
+		}
 	}
 
 	if len(*abuseContacts) == 0 {
