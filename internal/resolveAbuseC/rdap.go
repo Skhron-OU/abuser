@@ -24,23 +24,23 @@ func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardPropert
 func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactType string) {
 	var emailType string
 
+	// process child Entities if any
+	for _, entityChild := range entity.Entities {
+		loopEntity(abuseContacts, &entityChild, contactType)
+	}
+
 	// process root Entity
 	if entity.VCard != nil {
-		if contactType == "abuse" { /* strict check */
+		if contactType == "abuse" {
 			emailType = contactType
 			if utils.Index(entity.Roles, contactType) != -1 {
 				mailboxCollector(abuseContacts, entity.VCard.Properties, emailType)
 				return
 			}
-		} else { /* fallback mode, gather all available emails */
+		} else if len(*abuseContacts) == 0 { /* fallback mode, gather all available emails */
 			emailType = typeAny
 			mailboxCollector(abuseContacts, entity.VCard.Properties, emailType)
 		}
-	}
-
-	// process child Entities if any
-	for _, entityChild := range entity.Entities {
-		loopEntity(abuseContacts, &entityChild, contactType)
 	}
 }
 
