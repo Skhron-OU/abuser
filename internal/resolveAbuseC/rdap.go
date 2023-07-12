@@ -1,9 +1,9 @@
 package resolveAbuseC
 
 import (
+	l "abuser/internal/logger"
 	"abuser/internal/utils"
 	"fmt"
-	"log"
 	"net/netip"
 
 	"github.com/openrdap/rdap"
@@ -71,7 +71,7 @@ func ForIpByRDAP(ip netip.Addr) []string {
 	if err == nil {
 		metaProcessor(&abuseContacts, &ipMeta.Entities)
 	} else {
-		log.Printf("ForIpByRDAP(%s) %s\n", ip.String(), err.Error())
+		l.Logger.Printf("%s, %s\n", ip.String(), err.Error())
 	}
 
 	return utils.Keys(abuseContacts)
@@ -86,7 +86,7 @@ func ForAsnByRDAP(asn string) []string {
 	if err == nil {
 		metaProcessor(&abuseContacts, &asnMeta.Entities)
 	} else {
-		log.Printf("ForAsnByRDAP(%s) %s\n", asn, err.Error())
+		l.Logger.Printf("%s, %s\n", asn, err.Error())
 	}
 
 	return utils.Keys(abuseContacts)

@@ -1,13 +1,13 @@
 package main
 
 import (
+	l "abuser/internal/logger"
 	"abuser/internal/mail"
 	"abuser/internal/resolveAbuseC"
 	"abuser/internal/utils"
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/netip"
 	"os"
@@ -42,8 +42,7 @@ type crowdsecEventMeta struct {
 }
 
 type crowdsecSource struct {
-	ASN string `json:"as_number"`
-	Ip  string `json:"ip"`
+	Ip string `json:"ip"`
 }
 
 type WebhookCrowdsec struct {
@@ -68,8 +67,7 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		Pass: os.Getenv("SMTP_PASS"),
 		Port: 465}
 
-	var resource resolveAbuseC.RIRObject
-	var abuseContacts []string
+	var abuseContacts, asns []string
 	email := mail.Email{EnvelopeFrom: os.Getenv("SMTP_SENDER")}
 	email.Headers = make(map[string]string)
 	email.Headers["From"] = email.EnvelopeFrom
@@ -79,15 +77,15 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 	var __event __portscan_event
 
 	for _, item := range parsedBody {
-		// TODO: crowdsec ASN discovery method is unreliable,
-		// thus I need to develop own IP-to-ASN resolution method
-		//abuseContacts = resolveAbuseC.ForAsnByRDAP(item.Source.ASN)
-
 		abuseContacts = resolveAbuseC.ForIpByRDAP(netip.MustParseAddr(item.Source.Ip))
 
-		resource.Resource = item.Source.Ip
+		asns = resolveAbuseC.ResolveASNsFromIP(netip.MustParseAddr(item.Source.Ip))
+		for _, asn := range asns {
+			abuseContacts = append(abuseContacts, resolveAbuseC.ForAsnByRDAP(asn)...)
+		}
+
 		if len(abuseContacts) == 0 { /* generic fallback, available for IPv4 only */
-			abuseContacts = append(abuseContacts, resource.ResolveAbuseContactByAbusix()...)
+			abuseContacts = append(abuseContacts, resolveAbuseC.ForIpByAbusix(netip.MustParseAddr(item.Source.Ip))...)
 		}
 
 		// remove duplicates
@@ -124,7 +122,7 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		buf.Reset()
 		err = tmpl_portscan_subject.Execute(buf, tmplvar)
 		utils.HandleCriticalError(err)
-		email.Headers["Subject"] = buf.String()
+		email.Headers["Subject"] = strings.TrimSpace(buf.String())
 
 		// TODO: fix timestamp length for proper tabulation
 		buf.Reset()
@@ -134,8 +132,6 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 
 		// TODO: X-ARF
 		email.Send(emailCreds, 0)
-
-		log.Printf("Sent abuse complaint for IP %s was to %s\n", item.Source.Ip, email.Headers["To"])
 	}
 }
 
@@ -148,7 +144,7 @@ func main() {
 	tmpl_portscan_body, err = template.ParseFiles("assets/templates/portscan/body.tmpl")
 	utils.HandleCriticalError(err)
 
-	log.Println("listening 127.0.0.1:8888")
+	l.Logger.Println("listening 127.0.0.1:8888")
 
 	// start HTTP server
 	http.HandleFunc("/webhook/crowdsec", webhookCrowdsec)

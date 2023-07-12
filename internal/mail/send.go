@@ -1,10 +1,10 @@
 package mail
 
 import (
+	l "abuser/internal/logger"
 	"abuser/internal/utils"
 	"crypto/tls"
 	"fmt"
-	"log"
 	"math"
 	"net/smtp"
 	"strings"
@@ -80,16 +80,18 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 
 	// acknowledge who are the recipients for SMTP server
 	recipientCount := len(email.EnvelopeTo)
+	var acceptedRecipients []string = nil
 	for _, recipient := range email.EnvelopeTo {
 		err = smtpConn.Rcpt(recipient)
 
 		if err == nil {
 			attempt = 0
+			acceptedRecipients = append(acceptedRecipients, recipient)
 		} else if attempt < retryAttempts {
 			errStr := err.Error()
 
 			if strings.Index(errStr, errAddressVerification) != -1 || strings.Index(errStr, errGreylisted) != -1 {
-				log.Printf("Retrying %s for %d time...\n", recipient, attempt)
+				l.Logger.Printf("[%s] Retrying %s for %d time...\n", email.Headers["Subject"], recipient, attempt+1)
 				go func(email *Email, creds *SMTP, attempt uint, recipient string) {
 					durationStr := fmt.Sprintf("%fs", math.Pow(4, float64(attempt)))
 					durationTime, err := time.ParseDuration(durationStr)
@@ -105,7 +107,7 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 					}
 				}(email, &creds, attempt+1, recipient)
 			} else {
-				log.Printf("Invalid recipient: %s\n", err.Error())
+				l.Logger.Printf("[%s] Invalid recipient <%s>: %s\n", email.Headers["Subject"], recipient, err.Error())
 			}
 		}
 
@@ -133,11 +135,13 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 		// appropriately acknowledge the end of the letter
 		err = w.Close()
 		utils.HandleCriticalError(err)
+
+		l.Logger.Printf("[%s] Abuse complaint was to %s\n", email.Headers["Subject"], strings.Join(acceptedRecipients, ", "))
 	} else {
 		// reset mail transaction because we have no recipients
 		err := smtpConn.Reset()
 		utils.HandleCriticalError(err)
-		log.Println("The letter has no valid recipients")
+		l.Logger.Printf("[%s] The letter has no valid recipients\n", email.Headers["Subject"])
 	}
 
 	// appropriately end our communication with the server

@@ -4,17 +4,19 @@ import (
 	"abuser/internal/utils"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
+	"net/netip"
 	"net/url"
+	"strconv"
 )
 
-type RIRObject struct {
-	Resource string // This could be anything: ASN, IP address
+type apiResponse_data_asns struct {
+	ASN int `json:"asn"`
 }
 
 type apiResponse_data struct {
-	Abuse_contacts []string `json:"abuse_contacts"`
+	Abuse_contacts []string                `json:"abuse_contacts"`
+	ASNs           []apiResponse_data_asns `json:"asns"`
 }
 
 type apiResponse struct {
@@ -23,28 +25,31 @@ type apiResponse struct {
 	Status   string           `json:"status"`
 }
 
-func (o *RIRObject) ResolveAbuseContactByRIPEstat() []string {
+func ResolveASNsFromIP(ip netip.Addr) []string {
 	param := make(map[string]string)
-	param["resource"] = o.Resource
+	param["data_overload_limit"] = "ignore"
+	param["min_peers_seeing"] = "10"
+	param["resource"] = ip.String()
 
-	response, err := craftRequest("abuse-contact-finder", param)
+	response, err := craftRequest("prefix-overview", param)
 	utils.HandleCriticalError(err)
 
 	response_json, err := ioutil.ReadAll(response.Body)
 	response.Body.Close()
 
-	var response_api apiResponse
+	var asns []string = nil
 
 	if response.StatusCode != 200 {
-		log.Printf("RIPEstat Data API error!\nHTTP status code: %d\nHTTP response body: %s\n",
-			response.StatusCode, response_json)
-		// this is to use fallback instead
-		return response_api.Data.Abuse_contacts
+		return asns
 	}
 
+	var response_api apiResponse
 	json.Unmarshal(response_json, &response_api)
 
-	return response_api.Data.Abuse_contacts
+	for _, asnObject := range response_api.Data.ASNs {
+		asns = append(asns, strconv.Itoa(asnObject.ASN))
+	}
+	return asns
 }
 
 func craftRequest(dataCall string, param map[string]string) (*http.Response, error) {

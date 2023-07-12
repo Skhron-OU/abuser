@@ -4,13 +4,14 @@ import (
 	"abuser/internal/utils"
 	"log"
 	"net"
+	"net/netip"
 	"strings"
 )
 
-func (o *RIRObject) ResolveAbuseContactByAbusix() []string {
-	octets := strings.Split(o.Resource, ".")
+func ForIpByAbusix(ip netip.Addr) []string {
+	octets := strings.Split(ip.String(), ".")
 	if len(octets) != 4 {
-		log.Printf("unsupported resource was given: %s\n", o.Resource)
+		log.Printf("unsupported resource was given: %s\n", ip.String())
 		return nil
 	}
 	utils.Reverse(octets)
