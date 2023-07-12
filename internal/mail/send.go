@@ -32,6 +32,7 @@ type Email struct {
 
 const retryAttempts = 10
 const errAddressVerification = "Recipient address rejected: unverified address: Address verification in progress"
+const errGreylisted = "Recipient address rejected: Greylisted"
 
 func (email *Email) Send(creds SMTP, attempt uint) {
 	tlsConnonfig := &tls.Config{
@@ -79,7 +80,7 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 
 	// acknowledge who are the recipients for SMTP server
 	recipientCount := len(email.EnvelopeTo)
-	for recipientIdx, recipient := range email.EnvelopeTo {
+	for _, recipient := range email.EnvelopeTo {
 		err = smtpConn.Rcpt(recipient)
 
 		if err == nil {
@@ -87,20 +88,22 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 		} else if attempt < retryAttempts {
 			errStr := err.Error()
 
-			if strings.Index(errStr, errAddressVerification) != -1 {
+			if strings.Index(errStr, errAddressVerification) != -1 || strings.Index(errStr, errGreylisted) != -1 {
 				log.Printf("Retrying %s for %d time...\n", recipient, attempt)
-				go func(email *Email, creds *SMTP, attempt uint, recipientIdx int) {
+				go func(email *Email, creds *SMTP, attempt uint, recipient string) {
 					durationStr := fmt.Sprintf("%fs", math.Pow(4, float64(attempt)))
 					durationTime, err := time.ParseDuration(durationStr)
 					if err != nil {
 						utils.HandleCriticalError(err)
 					} else {
 						time.Sleep(durationTime)
-						newEmail := email
-						newEmail.EnvelopeTo = email.EnvelopeTo[recipientIdx : recipientIdx+1]
+
+						newEmail := *email
+						newEmail.EnvelopeTo = nil
+						newEmail.EnvelopeTo = append(newEmail.EnvelopeTo, recipient)
 						go newEmail.Send(*creds, attempt)
 					}
-				}(email, &creds, attempt+1, recipientIdx)
+				}(email, &creds, attempt+1, recipient)
 			} else {
 				log.Printf("Invalid recipient: %s\n", err.Error())
 			}
