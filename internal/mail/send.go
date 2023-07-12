@@ -134,6 +134,9 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 		err = w.Close()
 		utils.HandleCriticalError(err)
 	} else {
+		// reset mail transaction because we have no recipients
+		err := smtpConn.Reset()
+		utils.HandleCriticalError(err)
 		log.Println("The letter has no valid recipients")
 	}
 
