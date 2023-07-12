@@ -18,8 +18,6 @@ import (
 
 var tmpl_portscan_subject, tmpl_portscan_body *template.Template
 
-// TODO: reply early, process parsedBody in a separate goroutine
-
 type __portscan_event struct {
 	SrcIp     string // compatibility with Body template
 	SrcPort   uint16
@@ -53,6 +51,7 @@ type WebhookCrowdsec struct {
 	Source crowdsecSource  `json:"source"`
 }
 
+// TODO: reply early, process parsedBody in a separate goroutine
 func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 	jsonBody, err := ioutil.ReadAll(r.Body)
 	r.Body.Close()
@@ -80,9 +79,11 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 	var __event __portscan_event
 
 	for _, item := range parsedBody {
-		// resolve abuse contacts
-		abuseContacts = resolveAbuseC.ForAsnByRDAP(item.Source.ASN)
-		abuseContacts = append(abuseContacts, resolveAbuseC.ForIpByRDAP(netip.MustParseAddr(item.Source.Ip))...)
+		// TODO: crowdsec ASN discovery method is unreliable,
+		// thus I need to develop own IP-to-ASN resolution method
+		//abuseContacts = resolveAbuseC.ForAsnByRDAP(item.Source.ASN)
+
+		abuseContacts = resolveAbuseC.ForIpByRDAP(netip.MustParseAddr(item.Source.Ip))
 
 		resource.Resource = item.Source.Ip
 		if len(abuseContacts) == 0 { /* generic fallback, available for IPv4 only */
@@ -131,6 +132,7 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		utils.HandleCriticalError(err)
 		email.Body = buf.String()
 
+		// TODO: X-ARF
 		email.Send(emailCreds, 0)
 
 		log.Printf("Sent abuse complaint for IP %s was to %s\n", item.Source.Ip, email.Headers["To"])
