@@ -131,7 +131,7 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		utils.HandleCriticalError(err)
 		email.Body = buf.String()
 
-		email.Send(emailCreds)
+		email.Send(emailCreds, 0)
 
 		log.Printf("Sent abuse complaint for IP %s was to %s\n", item.Source.Ip, email.Headers["To"])
 	}

@@ -5,8 +5,10 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
+	"math"
 	"net/smtp"
 	"strings"
+	"time"
 )
 
 type SMTP struct {
@@ -28,7 +30,10 @@ type Email struct {
 	Body         string
 }
 
-func (email *Email) Send(creds SMTP) {
+const retryAttempts = 10
+const errAddressVerification = "Recipient address rejected: unverified address: Address verification in progress"
+
+func (email *Email) Send(creds SMTP, attempt uint) {
 	tlsConnonfig := &tls.Config{
 		InsecureSkipVerify: false,
 		ServerName:         creds.Host,
@@ -36,7 +41,24 @@ func (email *Email) Send(creds SMTP) {
 
 	// establish TLS connection (encapsulate plaintext SMTP communitcation within it)
 	tlsConn, err := tls.Dial("tcp", creds.GetAddr(), tlsConnonfig)
-	utils.HandleCriticalError(err)
+
+	/* TODO: better mechanism to requeue letters */
+	if err == nil {
+		attempt = 0
+	} else if attempt < retryAttempts {
+		go func(email *Email, creds *SMTP, attempt uint) {
+			durationStr := fmt.Sprintf("%fs", math.Pow(4, float64(attempt)))
+			durationTime, err := time.ParseDuration(durationStr)
+			if err != nil {
+				utils.HandleCriticalError(err)
+			} else {
+				time.Sleep(durationTime)
+				email.Send(*creds, attempt)
+			}
+		}(email, &creds, attempt+1)
+	} else {
+		utils.HandleCriticalError(err)
+	}
 
 	// establish SMTP connection
 	smtpConn, err := smtp.NewClient(tlsConn, creds.Host)
@@ -57,10 +79,34 @@ func (email *Email) Send(creds SMTP) {
 
 	// acknowledge who are the recipients for SMTP server
 	recipientCount := len(email.EnvelopeTo)
-	for _, recipient := range email.EnvelopeTo {
+	for recipientIdx, recipient := range email.EnvelopeTo {
 		err = smtpConn.Rcpt(recipient)
+
+		if err == nil {
+			attempt = 0
+		} else if attempt < retryAttempts {
+			errStr := err.Error()
+
+			if strings.Index(errStr, errAddressVerification) != -1 {
+				log.Printf("Retrying %s for %d time...\n", recipient, attempt)
+				go func(email *Email, creds *SMTP, attempt uint, recipientIdx int) {
+					durationStr := fmt.Sprintf("%fs", math.Pow(4, float64(attempt)))
+					durationTime, err := time.ParseDuration(durationStr)
+					if err != nil {
+						utils.HandleCriticalError(err)
+					} else {
+						time.Sleep(durationTime)
+						newEmail := email
+						newEmail.EnvelopeTo = email.EnvelopeTo[recipientIdx : recipientIdx+1]
+						go newEmail.Send(*creds, attempt)
+					}
+				}(email, &creds, attempt+1, recipientIdx)
+			} else {
+				log.Printf("Invalid recipient: %s\n", err.Error())
+			}
+		}
+
 		if err != nil {
-			log.Printf("Invalid recipient: %s\n", err.Error())
 			recipientCount--
 		}
 	}
