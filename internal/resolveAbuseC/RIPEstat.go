@@ -28,7 +28,7 @@ type apiResponse struct {
 func ResolveASNsFromIP(ip netip.Addr) []string {
 	param := make(map[string]string)
 	param["data_overload_limit"] = "ignore"
-	param["min_peers_seeing"] = "10"
+	param["min_peers_seeing"] = "30"
 	param["resource"] = ip.String()
 
 	response, err := craftRequest("prefix-overview", param)
