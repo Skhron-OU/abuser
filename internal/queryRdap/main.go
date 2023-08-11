@@ -1,4 +1,4 @@
-package resolveAbuseC
+package queryRdap
 
 import (
 	l "abuser/internal/logger"
@@ -63,7 +63,7 @@ func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
 	}
 }
 
-func ForIpByRDAP(ip netip.Addr) []string {
+func IpToAbuseC(ip netip.Addr) []string {
 	var err error
 	var ipMeta *rdap.IPNetwork
 
@@ -86,7 +86,7 @@ func ForIpByRDAP(ip netip.Addr) []string {
 	return utils.Keys(abuseContacts)
 }
 
-func ForAsnByRDAP(asn string) []string {
+func AsnToAbuseC(asn string) []string {
 	var err error
 	var asnMeta *rdap.Autnum
 

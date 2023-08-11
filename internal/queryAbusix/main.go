@@ -1,4 +1,4 @@
-package resolveAbuseC
+package queryAbusix
 
 import (
 	"abuser/internal/utils"
@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func ForIpByAbusix(ip netip.Addr) []string {
+func IpToAbuseC(ip netip.Addr) []string {
 	octets := strings.Split(ip.String(), ".")
 	if len(octets) != 4 {
 		log.Printf("unsupported resource was given: %s\n", ip.String())

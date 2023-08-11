@@ -1,4 +1,4 @@
-package resolveAbuseC
+package queryRipeStat
 
 import (
 	"abuser/internal/utils"
@@ -25,7 +25,7 @@ type apiResponse struct {
 	Status   string           `json:"status"`
 }
 
-func ResolveASNsFromIP(ip netip.Addr) []string {
+func IpToAsn(ip netip.Addr) []string {
 	param := make(map[string]string)
 	param["data_overload_limit"] = "ignore"
 	param["min_peers_seeing"] = "30"

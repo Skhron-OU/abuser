@@ -3,7 +3,7 @@ package main
 import (
 	l "abuser/internal/logger"
 	"abuser/internal/mail"
-	"abuser/internal/resolveAbuseC"
+	"abuser/internal/queryGeneric"
 	"abuser/internal/utils"
 	"bytes"
 	"encoding/json"
@@ -67,7 +67,7 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		Pass: os.Getenv("SMTP_PASS"),
 		Port: 465}
 
-	var abuseContacts, asns []string
+	var abuseContacts []string
 	email := mail.Email{EnvelopeFrom: os.Getenv("SMTP_ENVELOPEFROM")}
 	email.Headers = make(map[string]string)
 	email.Headers["From"] = os.Getenv("SMTP_SENDER")
@@ -79,19 +79,7 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 	for _, item := range parsedBody {
 		ipAddr := netip.MustParseAddr(item.Source.Ip)
 
-		abuseContacts = resolveAbuseC.ForIpByRDAP(ipAddr)
-
-		asns = resolveAbuseC.ResolveASNsFromIP(ipAddr)
-		for _, asn := range asns {
-			abuseContacts = append(abuseContacts, resolveAbuseC.ForAsnByRDAP(asn)...)
-		}
-
-		if len(abuseContacts) == 0 { /* generic fallback, available for IPv4 only */
-			abuseContacts = append(abuseContacts, resolveAbuseC.ForIpByAbusix(ipAddr)...)
-		}
-
-		// remove duplicates
-		abuseContacts = utils.GetUnique(abuseContacts)
+		abuseContacts = queryGeneric.IpToAbuseC(ipAddr)
 
 		// template paremeters
 		tmplvar = tmplvar_portscan{Ip: item.Source.Ip, Events: nil}
