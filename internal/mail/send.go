@@ -31,8 +31,17 @@ type Email struct {
 }
 
 const retryAttempts = 10
-const errAddressVerification = "Recipient address rejected: unverified address: Address verification in progress"
-const errGreylisted = "Recipient address rejected: Greylisted"
+
+var errsTemporary []string = []string{
+	"try later",
+	"try again later",
+	"temporarily deferred",
+	"temporarily unavailable",
+	"Greylist",
+	"Silverlist",
+	"Service currently unavailable",
+	"Address verification in progress",
+}
 
 func (email *Email) Send(creds SMTP, attempt uint) {
 	tlsConnonfig := &tls.Config{
@@ -87,7 +96,16 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 		} else if attempt < retryAttempts {
 			errStr := err.Error()
 
-			if strings.Index(errStr, errAddressVerification) != -1 || strings.Index(errStr, errGreylisted) != -1 {
+			// TODO: consider matching on SMTP error codes instead?
+			isTemporary := false
+			for _, temporaryErrStr := range errsTemporary {
+				isTemporary = isTemporary || (strings.Index(errStr, temporaryErrStr) != -1)
+				if isTemporary {
+					break
+				}
+			}
+
+			if isTemporary {
 				l.Logger.Printf("[%s] Retrying %s for %d time...\n", email.Headers["Subject"], recipient, attempt+1)
 				go func(email *Email, creds *SMTP, attempt uint, recipient string) {
 					durationStr := fmt.Sprintf("%fs", math.Pow(4, float64(attempt)))
