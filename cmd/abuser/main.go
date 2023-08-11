@@ -68,9 +68,9 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		Port: 465}
 
 	var abuseContacts, asns []string
-	email := mail.Email{EnvelopeFrom: os.Getenv("SMTP_SENDER")}
+	email := mail.Email{EnvelopeFrom: os.Getenv("SMTP_ENVELOPEFROM")}
 	email.Headers = make(map[string]string)
-	email.Headers["From"] = email.EnvelopeFrom
+	email.Headers["From"] = os.Getenv("SMTP_SENDER")
 
 	buf := &bytes.Buffer{}
 	var tmplvar tmplvar_portscan
@@ -115,9 +115,6 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		// generate email
 		email.EnvelopeTo = abuseContacts
 		email.Headers["To"] = strings.Join(abuseContacts, ", ")
-
-		// TODO: option to toggle BCC
-		//email.EnvelopeTo = append(email.EnvelopeTo, email.EnvelopeFrom)
 
 		buf.Reset()
 		err = tmpl_portscan_subject.Execute(buf, tmplvar)
