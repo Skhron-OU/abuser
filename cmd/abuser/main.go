@@ -77,15 +77,17 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 	var __event __portscan_event
 
 	for _, item := range parsedBody {
-		abuseContacts = resolveAbuseC.ForIpByRDAP(netip.MustParseAddr(item.Source.Ip))
+		ipAddr := netip.MustParseAddr(item.Source.Ip)
 
-		asns = resolveAbuseC.ResolveASNsFromIP(netip.MustParseAddr(item.Source.Ip))
+		abuseContacts = resolveAbuseC.ForIpByRDAP(ipAddr)
+
+		asns = resolveAbuseC.ResolveASNsFromIP(ipAddr)
 		for _, asn := range asns {
 			abuseContacts = append(abuseContacts, resolveAbuseC.ForAsnByRDAP(asn)...)
 		}
 
 		if len(abuseContacts) == 0 { /* generic fallback, available for IPv4 only */
-			abuseContacts = append(abuseContacts, resolveAbuseC.ForIpByAbusix(netip.MustParseAddr(item.Source.Ip))...)
+			abuseContacts = append(abuseContacts, resolveAbuseC.ForIpByAbusix(ipAddr)...)
 		}
 
 		// remove duplicates
