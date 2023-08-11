@@ -44,9 +44,7 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 	tlsConn, err := tls.Dial("tcp", creds.GetAddr(), tlsConnonfig)
 
 	/* TODO: better mechanism to requeue letters */
-	if err == nil {
-		attempt = 0
-	} else if attempt < retryAttempts {
+	if err != nil && attempt < retryAttempts {
 		go func(email *Email, creds *SMTP, attempt uint) {
 			durationStr := fmt.Sprintf("%fs", math.Pow(4, float64(attempt)))
 			durationTime, err := time.ParseDuration(durationStr)
@@ -85,7 +83,6 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 		err = smtpConn.Rcpt(recipient)
 
 		if err == nil {
-			attempt = 0
 			acceptedRecipients = append(acceptedRecipients, recipient)
 		} else if attempt < retryAttempts {
 			errStr := err.Error()
