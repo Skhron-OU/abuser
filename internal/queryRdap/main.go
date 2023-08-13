@@ -69,7 +69,7 @@ func IpToAbuseC(ip netip.Addr) []string {
 
 	client := &rdap.Client{UserAgent: "SkhronAbuseComplaintSender"}
 
-	for i := 0; i < 5 && err != nil; i++ {
+	for i := 0; i == 0 || (i < 5 && err != nil); i++ {
 		ipMeta, err = client.QueryIP(ip.String())
 		time.Sleep(time.Second * time.Duration(i*2))
 	}
@@ -92,7 +92,7 @@ func AsnToAbuseC(asn string) []string {
 
 	client := &rdap.Client{UserAgent: "SkhronAbuseComplaintSender"}
 
-	for i := 0; i < 5 && err != nil; i++ {
+	for i := 0; i == 0 || (i < 5 && err != nil); i++ {
 		asnMeta, err = client.QueryAutnum(asn)
 		time.Sleep(time.Second * time.Duration(i*2))
 	}
