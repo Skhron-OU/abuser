@@ -2,17 +2,14 @@ package main
 
 import (
 	l "abuser/internal/logger"
-	"abuser/internal/mail"
 	"abuser/internal/queryGeneric"
+	"abuser/internal/reporter"
 	"abuser/internal/utils"
-	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"net/netip"
-	"os"
 	"strconv"
-	"strings"
 	"text/template"
 )
 
@@ -57,22 +54,11 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 	utils.HandleCriticalError(err)
 
 	var parsedBody []WebhookCrowdsec
-	json.Unmarshal(jsonBody, &parsedBody)
-
-	var emailCreds mail.SMTP
-	emailCreds = mail.SMTP{
-		Helo: os.Getenv("SMTP_HELO"),
-		Host: os.Getenv("SMTP_HOST"),
-		User: os.Getenv("SMTP_USER"),
-		Pass: os.Getenv("SMTP_PASS"),
-		Port: 465}
+	err = json.Unmarshal(jsonBody, &parsedBody)
+	utils.HandleCriticalError(err)
 
 	var abuseContacts []string
-	email := mail.Email{EnvelopeFrom: os.Getenv("SMTP_ENVELOPEFROM")}
-	email.Headers = make(map[string]string)
-	email.Headers["From"] = os.Getenv("SMTP_SENDER")
 
-	buf := &bytes.Buffer{}
 	var tmplvar tmplvar_portscan
 	var __event __portscan_event
 
@@ -102,23 +88,7 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 			tmplvar.Events = append(tmplvar.Events, __event)
 		}
 
-		// generate email
-		email.EnvelopeTo = abuseContacts
-		email.Headers["To"] = strings.Join(abuseContacts, ", ")
-
-		buf.Reset()
-		err = tmpl_portscan_subject.Execute(buf, tmplvar)
-		utils.HandleCriticalError(err)
-		email.Headers["Subject"] = strings.TrimSpace(buf.String())
-
-		// TODO: fix timestamp length for proper tabulation
-		buf.Reset()
-		err = tmpl_portscan_body.Execute(buf, tmplvar)
-		utils.HandleCriticalError(err)
-		email.Body = buf.String()
-
-		// TODO: X-ARF
-		email.Send(emailCreds, 0)
+		reporter.Report(abuseContacts, ipAddr, tmplvar, "portscan")
 	}
 }
 
