@@ -26,8 +26,8 @@ Important note:
 -------------------------------------------------------------------------------
 -           Log of port scans verified by a TCP three-way handshake           -
 -------------------------------------------------------------------------------
-Timestamp			SrcIP		SrcPort	DstIP		DstPort{{range .Events}}
-{{.Timestamp}} 	{{.SrcIp}}	{{.SrcPort}}	{{.DstIp}}	{{.DstPort}}{{end}}
+Timestamp                SrcIP            SrcPort DstIP            DstPort{{range .Events}}
+{{printf "%-24s" .Timestamp}} {{printf "%-16s" .SrcIp}} {{printf "%-5d" .SrcPort}}   {{printf "%-16s" .DstIp}} {{printf "%-5d" .DstPort}}{{end}}
 -------------------------------------------------------------------------------
 
 Kind regards,
