@@ -39,6 +39,7 @@ var errsTemporary []string = []string{
 	"temporarily unavailable",
 	"Greylist",
 	"Silverlist",
+	"Domain not found", // may be due to temporary DNS issue
 	"Service currently unavailable",
 	"Address verification in progress",
 }
