@@ -151,7 +151,7 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 		err = w.Close()
 		utils.HandleCriticalError(err)
 
-		l.Logger.Printf("[%s] Abuse complaint was to %s\n", email.Headers["Subject"], strings.Join(acceptedRecipients, ", "))
+		l.Logger.Printf("[%s] Abuse complaint was sent to %s\n", email.Headers["Subject"], strings.Join(acceptedRecipients, ", "))
 	} else {
 		// reset mail transaction because we have no recipients
 		err := smtpConn.Reset()
