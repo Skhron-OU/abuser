@@ -77,8 +77,11 @@ func IpToAbuseC(ip netip.Addr) []string {
 	var abuseContacts map[string]bool = make(map[string]bool, 0)
 
 	if err == nil {
-		metaProcessor(&abuseContacts, &ipMeta.Entities)
-		// TODO: cache
+		metaProcessor(&abuseContacts, &ipMeta.Entities) // TODO: cache
+
+		if ipMeta.Country == "BR" { // they wish to receive copies of complaints
+			abuseContacts["cert@cert.br"] = true
+		}
 	} else {
 		l.Logger.Printf("[%s] RDAP query failed: %s\n", ip.String(), err.Error())
 	}
