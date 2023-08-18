@@ -62,34 +62,36 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 	var tmplvar tmplvar_portscan
 	var __event __portscan_event
 
-	for _, item := range parsedBody {
-		ipAddr := netip.MustParseAddr(item.Source.Ip)
+	go func() {
+		for _, item := range parsedBody {
+			ipAddr := netip.MustParseAddr(item.Source.Ip)
 
-		abuseContacts = queryGeneric.IpToAbuseC(ipAddr)
+			abuseContacts = queryGeneric.IpToAbuseC(ipAddr)
 
-		// template paremeters
-		tmplvar = tmplvar_portscan{Ip: item.Source.Ip, Events: nil}
+			// template paremeters
+			tmplvar = tmplvar_portscan{Ip: item.Source.Ip, Events: nil}
 
-		for _, event := range item.Events {
-			__event.Timestamp = event.Timestamp
-			for _, meta := range event.Meta {
-				if meta.Key == "source_port" {
-					srcPort, _ := strconv.ParseUint(meta.Value, 10, 16)
-					__event.SrcPort = uint16(srcPort)
-				} else if meta.Key == "source_ip" {
-					__event.SrcIp = meta.Value
-				} else if meta.Key == "destination_port" {
-					srcPort, _ := strconv.ParseUint(meta.Value, 10, 16)
-					__event.DstPort = uint16(srcPort)
-				} else if meta.Key == "destination_ip" {
-					__event.DstIp = meta.Value
+			for _, event := range item.Events {
+				__event.Timestamp = event.Timestamp
+				for _, meta := range event.Meta {
+					if meta.Key == "source_port" {
+						srcPort, _ := strconv.ParseUint(meta.Value, 10, 16)
+						__event.SrcPort = uint16(srcPort)
+					} else if meta.Key == "source_ip" {
+						__event.SrcIp = meta.Value
+					} else if meta.Key == "destination_port" {
+						srcPort, _ := strconv.ParseUint(meta.Value, 10, 16)
+						__event.DstPort = uint16(srcPort)
+					} else if meta.Key == "destination_ip" {
+						__event.DstIp = meta.Value
+					}
 				}
+				tmplvar.Events = append(tmplvar.Events, __event)
 			}
-			tmplvar.Events = append(tmplvar.Events, __event)
-		}
 
-		reporter.Report(abuseContacts, ipAddr, tmplvar, "portscan")
-	}
+			reporter.Report(abuseContacts, ipAddr, tmplvar, "portscan")
+		}
+	}()
 }
 
 func main() {
