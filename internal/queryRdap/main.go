@@ -81,6 +81,8 @@ func IpToAbuseC(ip netip.Addr) []string {
 
 		if ipMeta.Country == "BR" { // they wish to receive copies of complaints
 			abuseContacts["cert@cert.br"] = true
+		} else if ipMeta.Country == "IN" {
+			abuseContacts["incident@cert-in.org.in"] = true
 		}
 	} else {
 		l.Logger.Printf("[%s] RDAP query failed: %s\n", ip.String(), err.Error())
