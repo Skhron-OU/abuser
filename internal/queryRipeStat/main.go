@@ -7,16 +7,21 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
-	"strconv"
 )
 
 type apiResponse_data_asns struct {
 	ASN int `json:"asn"`
 }
 
+type apiResponse_data_record struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type apiResponse_data struct {
-	Abuse_contacts []string                `json:"abuse_contacts"`
-	ASNs           []apiResponse_data_asns `json:"asns"`
+	Abuse_contacts []string                    `json:"abuse_contacts"`
+	ASNs           []apiResponse_data_asns     `json:"asns"`
+	IRR_Records    [][]apiResponse_data_record `json:"irr_records"`
 }
 
 type apiResponse struct {
@@ -27,29 +32,31 @@ type apiResponse struct {
 
 func IpToAsn(ip netip.Addr) []string {
 	param := make(map[string]string)
-	param["data_overload_limit"] = "ignore"
-	param["min_peers_seeing"] = "30"
 	param["resource"] = ip.String()
 
-	response, err := craftRequest("prefix-overview", param)
+	response, err := craftRequest("whois", param)
 	utils.HandleCriticalError(err)
 
 	response_json, err := ioutil.ReadAll(response.Body)
 	response.Body.Close()
 
-	var asns []string = nil
+	var asns map[string]bool = make(map[string]bool)
 
 	if response.StatusCode != 200 {
-		return asns
+		return []string{}
 	}
 
 	var response_api apiResponse
 	json.Unmarshal(response_json, &response_api)
 
-	for _, asnObject := range response_api.Data.ASNs {
-		asns = append(asns, strconv.Itoa(asnObject.ASN))
+	for _, records := range response_api.Data.IRR_Records {
+		for _, record := range records {
+			if record.Key == "origin" {
+				asns[record.Value] = true
+			}
+		}
 	}
-	return asns
+	return utils.Keys(asns)
 }
 
 func craftRequest(dataCall string, param map[string]string) (*http.Response, error) {

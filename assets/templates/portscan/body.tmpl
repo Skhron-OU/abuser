@@ -22,11 +22,11 @@ Otherwise we insist that you and/or your end-user will take all necessary action
 
 Our automated toolset tries to lookup email addresses in the following way:
 
-Firstly, abuse mailboxes for both IP address and Autonomous System (AS) to ensure the deliverability of the complaint to an appropriate party.
+Firstly, abuse mailboxes for both IP address and Autonomous System (AS) to ensure the deliverability of the complaint to an appropriate party. NOTICE: we lookup Autonomous System Numbers as seen from WHOIS [1].
 Secondly, if no abuse mailboxes were discovered, all emails from abuse contacts entities for both IP address and AS are used.
 Thirdly, if there is still no email addresses discovered, all discovered emails for both IP address and AS are used.
 
-Our interaction with RIR databases are done solely via Registration Data Access Protocol (RDAP) which is the machine-readable successor to WHOIS. As you can see at [1], RDAP is supported by all RIRs and thus is a reliable source of data.
+Our interaction with RIR databases are done solely via Registration Data Access Protocol (RDAP) which is the machine-readable successor to WHOIS. As you can see at [2], RDAP is supported by all RIRs and thus is a reliable source of data.
 
 # Notes
 
@@ -45,7 +45,8 @@ Timestamp                SrcIP            SrcPort DstIP            DstPort{{rang
 
 # Links
 
-[1]: https://www.iana.org/assignments/as-numbers/as-numbers.txt
+[1]: https://stat.ripe.net/docs/data_api/#whois
+[2]: https://www.iana.org/assignments/as-numbers/as-numbers.txt
 
 Kind regards,
 Network department
