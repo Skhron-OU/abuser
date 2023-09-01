@@ -10,6 +10,7 @@ import (
 
 // TODO: generate clarification why specific email address was added to further
 // embed this explanation into the abuse letter
+// TODO: handle bogons: either IP/ASN or both
 func IpToAbuseC(ip netip.Addr) []string {
 	var abuseContacts []string = queryRdap.IpToAbuseC(ip)
 
@@ -18,7 +19,7 @@ func IpToAbuseC(ip netip.Addr) []string {
 	}
 
 	if len(abuseContacts) == 0 { /* generic fallback, available for IPv4 only */
-		abuseContacts = append(abuseContacts, queryAbusix.IpToAbuseC(ip)...)
+		abuseContacts = queryAbusix.IpToAbuseC(ip)
 	}
 
 	// remove duplicates

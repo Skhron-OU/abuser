@@ -19,7 +19,7 @@ func IpToAbuseC(ip netip.Addr) []string {
 	contacts, _ := net.LookupTXT(strings.Join(octets, ".") + ".abuse-contacts.abusix.zone.")
 
 	if len(contacts) == 0 { /* fallback */
-		contacts = append(contacts, "abuse+contact-not-found@skhron.com.ua")
+		return []string{"abuse+contact-not-found@skhron.com.ua"}
 	}
 
 	return contacts

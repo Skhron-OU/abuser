@@ -117,8 +117,7 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 						time.Sleep(durationTime)
 
 						newEmail := *email
-						newEmail.EnvelopeTo = nil
-						newEmail.EnvelopeTo = append(newEmail.EnvelopeTo, recipient)
+						newEmail.EnvelopeTo = []string{recipient}
 						go newEmail.Send(*creds, attempt)
 					}
 				}(email, &creds, attempt+1, recipient)

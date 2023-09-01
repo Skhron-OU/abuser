@@ -10,10 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strconv"
-	"text/template"
 )
-
-var tmpl_portscan_subject, tmpl_portscan_body *template.Template
 
 type __portscan_event struct {
 	SrcIp     string // compatibility with Body template
@@ -47,7 +44,6 @@ type WebhookCrowdsec struct {
 	Source crowdsecSource  `json:"source"`
 }
 
-// TODO: reply early, process parsedBody in a separate goroutine
 func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 	jsonBody, err := ioutil.ReadAll(r.Body)
 	r.Body.Close()
@@ -95,14 +91,6 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	var err error
-
-	// prepare templates
-	tmpl_portscan_subject, err = template.ParseFiles("assets/templates/portscan/subject.tmpl")
-	utils.HandleCriticalError(err)
-	tmpl_portscan_body, err = template.ParseFiles("assets/templates/portscan/body.tmpl")
-	utils.HandleCriticalError(err)
-
 	l.Logger.Println("listening 127.0.0.1:8888")
 
 	// start HTTP server
