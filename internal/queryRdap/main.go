@@ -63,6 +63,17 @@ func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
 	}
 }
 
+// copied from openrdap/rdap/client_error.go...
+func isClientError(t rdap.ClientErrorType, err error) bool {
+	if ce, ok := err.(*rdap.ClientError); ok {
+		if ce.Type == t {
+			return true
+		}
+	}
+
+	return false
+}
+
 func IpToAbuseC(ip netip.Addr) []string {
 	var err error
 	var ipMeta *rdap.IPNetwork
@@ -71,13 +82,24 @@ func IpToAbuseC(ip netip.Addr) []string {
 
 	for i := 0; i == 0 || (i < 5 && err != nil); i++ {
 		ipMeta, err = client.QueryIP(ip.String())
+		if isClientError(rdap.ObjectDoesNotExist, err) {
+			// TODO: we need to somehow handle bogon resources...
+			// do not retry if the object was not found
+			break
+		}
+
 		time.Sleep(time.Second * time.Duration(i*2))
 	}
 
 	var abuseContacts map[string]bool = make(map[string]bool, 0)
 
 	if err == nil {
-		metaProcessor(&abuseContacts, &ipMeta.Entities) // TODO: cache
+		if ipMeta.Type == "ALLOCATED UNSPECIFIED" {
+			// TODO: we need to somehow handle bogon resources...
+			return nil
+		}
+
+		metaProcessor(&abuseContacts, &ipMeta.Entities)
 
 		if ipMeta.Country == "BR" { // they wish to receive copies of complaints
 			abuseContacts["cert@cert.br"] = true
@@ -99,6 +121,12 @@ func AsnToAbuseC(asn string) []string {
 
 	for i := 0; i == 0 || (i < 5 && err != nil); i++ {
 		asnMeta, err = client.QueryAutnum(asn)
+		if isClientError(rdap.ObjectDoesNotExist, err) {
+			// TODO: we need to somehow handle bogon resources...
+			// do not retry if the object was not found
+			break
+		}
+
 		time.Sleep(time.Second * time.Duration(i*2))
 	}
 
@@ -106,7 +134,6 @@ func AsnToAbuseC(asn string) []string {
 
 	if err == nil {
 		metaProcessor(&abuseContacts, &asnMeta.Entities)
-		// TODO: cache
 	} else {
 		l.Logger.Printf("[%s] RDAP query failed: %s\n", asn, err.Error())
 	}
