@@ -17,7 +17,7 @@ func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardPropert
 	for _, property := range props {
 		if property.Name == "email" && property.Type == "text" {
 			if emailType == typeAny || utils.Index(property.Parameters["type"], emailType) != -1 {
-				(*abuseContacts)[fmt.Sprint(property.Value)] = true
+				(*abuseContacts)[strings.ToLower(fmt.Sprint(property.Value))] = true
 			}
 		}
 	}
