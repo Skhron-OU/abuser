@@ -1,27 +1,40 @@
-** This is an automated message, reply to get human response **
+******************************************************************************
+* WARNING!!! This is an automated message. All replies to this email will be *
+* seen by a real human. Please be sure to include this letter to your answer *
+******************************************************************************
 
-Dear Sir or Madam,
+To Whom It May Concern:
 
-We have evidence that a network scan (or network attack) was carried out on a
-server belonging to a client of ours, from an IP address under your
-responsibility.
+There are different stateful traps on an unused IP addresses within our networks to detect network scans (or a network attacks) carried to the Internet-wide or explicitly targetting our infrastructure.
 
-Please take all necessary actions to avoid this in the future and to resolve
-the current issue.
+The IP address {{.Ip}} has made a few connections to our TCP traps as provided in the logs section below. This means the host behind that IP address is either infected with a virus, participates in a botnet, or performs Internet-wide research.
 
-Furthermore we request a short statement, with information
-on the cause of the issue, as well as your response.
+Whatever the reason is for this behaviour for IP address {{.Ip}}, we urge you to cease and desist this kind of activity. Otherwise this IP address will be blackholed for prolonged period of time within our networks.
 
-Please reply to this letter for the statement.
+If you are a security researcher, please add the following ranges to your blacklist:
 
-Notes:
-- You should get this information only a few minutes after the incident.
-- All timestamps are in Coordinated Universal Time (UTC).
+ - 88.218.206.0/24
+ - 2a09:b280:fe00::/48
 
-Important note:
-- Please note that we do not provide telephone support in our department.
-- If you have any questions, please send them to us by responding to this
-  email.
+Otherwise we insist that you and/or your end-user will take all necessary actions to avoid this in the future and to resolve the current issue.
+
+# Why my email address was added to the recipient list?
+
+Our automated toolset tries to lookup email addresses in the following way:
+
+Firstly, abuse mailboxes for both IP address and Autonomous System (AS) to ensure the deliverability of the complaint to an appropriate party.
+Secondly, if no abuse mailboxes were discovered, all emails from abuse contacts entities for both IP address and AS are used.
+Thirdly, if there is still no email addresses discovered, all discovered emails for both IP address and AS are used.
+
+Our interaction with RIR databases are done solely via Registration Data Access Protocol (RDAP) which is the machine-readable successor to WHOIS. As you can see at [1], RDAP is supported by all RIRs and thus is a reliable source of data.
+
+# Notes
+
+Please note that you should get this message at most only a few minutes after the incident. For your reference, all provided timestamps are in Coordinated Universal Time (UTC).
+
+If you have any questions, please send them to us by responding to this email. Please be sure to include this letter in further correspondence to make it easy for us to assist you within the current case.
+
+# Logs
 
 -------------------------------------------------------------------------------
 -           Log of port scans verified by a TCP three-way handshake           -
@@ -29,6 +42,10 @@ Important note:
 Timestamp                SrcIP            SrcPort DstIP            DstPort{{range .Events}}
 {{printf "%-24s" .Timestamp}} {{printf "%-16s" .SrcIp}} {{printf "%-5d" .SrcPort}}   {{printf "%-16s" .DstIp}} {{printf "%-5d" .DstPort}}{{end}}
 -------------------------------------------------------------------------------
+
+# Links
+
+[1]: https://www.iana.org/assignments/as-numbers/as-numbers.txt
 
 Kind regards,
 Network department
