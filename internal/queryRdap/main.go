@@ -5,6 +5,7 @@ import (
 	"abuser/internal/utils"
 	"fmt"
 	"net/netip"
+	"strings"
 	"time"
 
 	"github.com/openrdap/rdap"
@@ -28,6 +29,21 @@ func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactType
 	// process child Entities if any
 	for _, entityChild := range entity.Entities {
 		loopEntity(abuseContacts, &entityChild, contactType)
+	}
+
+	// skip invalid contacts
+	for _, remark := range entity.Remarks {
+		if remark.Title == "Unvalidated POC" { // ARIN-specific
+			return
+		}
+
+		for _, description := range remark.Description {
+			if strings.HasSuffix(description, " is invalid") { // APNIC-specific
+				return
+			} else if description == "Please contact the tech-c or admin-c of the network." { // CNNIC warning
+				return
+			}
+		}
 	}
 
 	// process root Entity
