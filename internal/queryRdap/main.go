@@ -2,9 +2,11 @@ package queryRdap
 
 import (
 	l "abuser/internal/logger"
+	"abuser/internal/queryError"
 	"abuser/internal/utils"
 	"fmt"
 	"net/netip"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,6 +14,12 @@ import (
 )
 
 const typeAny = "*any*"
+
+var emailRegexp *regexp.Regexp
+
+func init() {
+	emailRegexp = regexp.MustCompile("(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\\])")
+}
 
 func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardProperty, emailType string) {
 	for _, property := range props {
@@ -24,8 +32,6 @@ func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardPropert
 }
 
 func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactType string) {
-	var emailType string
-
 	// process child Entities if any
 	for _, entityChild := range entity.Entities {
 		loopEntity(abuseContacts, &entityChild, contactType)
@@ -55,8 +61,7 @@ func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactType
 				mailboxCollector(abuseContacts, entity.VCard.Properties, typeAny)
 			}
 		} else { /* fallback mode, gather all available emails */
-			emailType = typeAny
-			mailboxCollector(abuseContacts, entity.VCard.Properties, emailType)
+			mailboxCollector(abuseContacts, entity.VCard.Properties, typeAny)
 		}
 	}
 }
@@ -66,16 +71,31 @@ func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
 		loopEntity(abuseContacts, &entity, "abuseMailbox")
 	}
 
-	if len(*abuseContacts) == 0 {
-		for _, entity := range *entities {
-			loopEntity(abuseContacts, &entity, "abuseContact")
+	for _, contactType := range []string{"abuseContact", typeAny} {
+		if len(*abuseContacts) == 0 {
+			for _, entity := range *entities {
+				loopEntity(abuseContacts, &entity, contactType)
+			}
+		} else {
+			break
+		}
+	}
+}
+
+func remarkProcessor(abuseContacts *map[string]bool, remarks *[]rdap.Remark, entities *[]rdap.Entity) {
+	var emails []string
+	for _, remark := range *remarks {
+		for _, description := range remark.Description {
+			emails = emailRegexp.FindAllString(description, -1)
+			for _, email := range emails {
+				(*abuseContacts)[email] = true
+			}
+			emails = nil
 		}
 	}
 
-	if len(*abuseContacts) == 0 {
-		for _, entity := range *entities {
-			loopEntity(abuseContacts, &entity, typeAny)
-		}
+	for _, entity := range *entities {
+		remarkProcessor(abuseContacts, &entity.Remarks, &entity.Entities)
 	}
 }
 
@@ -90,7 +110,7 @@ func isClientError(t rdap.ClientErrorType, err error) bool {
 	return false
 }
 
-func IpToAbuseC(ip netip.Addr) []string {
+func IpToAbuseC(ip netip.Addr) ([]string, error) {
 	var err error
 	var ipMeta *rdap.IPNetwork
 
@@ -99,9 +119,7 @@ func IpToAbuseC(ip netip.Addr) []string {
 	for i := 0; i == 0 || (i < 5 && err != nil); i++ {
 		ipMeta, err = client.QueryIP(ip.String())
 		if isClientError(rdap.ObjectDoesNotExist, err) {
-			// TODO: we need to somehow handle bogon resources...
-			// do not retry if the object was not found
-			break
+			return nil, queryError.BogonResource
 		}
 
 		time.Sleep(time.Second * time.Duration(i*2))
@@ -111,11 +129,15 @@ func IpToAbuseC(ip netip.Addr) []string {
 
 	if err == nil {
 		if ipMeta.Type == "ALLOCATED UNSPECIFIED" {
-			// TODO: we need to somehow handle bogon resources...
-			return nil
+			return nil, queryError.BogonResource
 		}
 
 		metaProcessor(&abuseContacts, &ipMeta.Entities)
+
+		// try to extract email from remarks... -_-
+		if len(abuseContacts) == 0 {
+			remarkProcessor(&abuseContacts, &ipMeta.Remarks, &ipMeta.Entities)
+		}
 
 		if ipMeta.Country == "BR" { // they wish to receive copies of complaints
 			abuseContacts["cert@cert.br"] = true
@@ -126,10 +148,10 @@ func IpToAbuseC(ip netip.Addr) []string {
 		l.Logger.Printf("[%s] RDAP query failed: %s\n", ip.String(), err.Error())
 	}
 
-	return utils.Keys(abuseContacts)
+	return utils.Keys(abuseContacts), nil
 }
 
-func AsnToAbuseC(asn string) []string {
+func AsnToAbuseC(asn string) ([]string, error) {
 	var err error
 	var asnMeta *rdap.Autnum
 
@@ -138,9 +160,7 @@ func AsnToAbuseC(asn string) []string {
 	for i := 0; i == 0 || (i < 5 && err != nil); i++ {
 		asnMeta, err = client.QueryAutnum(asn)
 		if isClientError(rdap.ObjectDoesNotExist, err) {
-			// TODO: we need to somehow handle bogon resources...
-			// do not retry if the object was not found
-			break
+			return nil, queryError.BogonResource
 		}
 
 		time.Sleep(time.Second * time.Duration(i*2))
@@ -150,9 +170,14 @@ func AsnToAbuseC(asn string) []string {
 
 	if err == nil {
 		metaProcessor(&abuseContacts, &asnMeta.Entities)
+
+		// try to extract email from remarks... -_-
+		if len(abuseContacts) == 0 {
+			remarkProcessor(&abuseContacts, &asnMeta.Remarks, &asnMeta.Entities)
+		}
 	} else {
 		l.Logger.Printf("[%s] RDAP query failed: %s\n", asn, err.Error())
 	}
 
-	return utils.Keys(abuseContacts)
+	return utils.Keys(abuseContacts), nil
 }

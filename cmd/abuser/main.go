@@ -54,6 +54,7 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 	utils.HandleCriticalError(err)
 
 	var abuseContacts []string
+	var bogonStatus queryGeneric.BogonStatus
 
 	var tmplvar tmplvar_portscan
 	var __event __portscan_event
@@ -62,7 +63,12 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 		for _, item := range parsedBody {
 			ipAddr := netip.MustParseAddr(item.Source.Ip)
 
-			abuseContacts = queryGeneric.IpToAbuseC(ipAddr)
+			abuseContacts, bogonStatus = queryGeneric.IpToAbuseC(ipAddr)
+			if bogonStatus.IsIpBogon && bogonStatus.IsNoValidAs {
+				// TODO: handle bogons and report them accordingly
+				l.Logger.Printf("[%s] Bogon resource! Bogon reports are currently not implemented, skipping.\n", item.Source.Ip)
+				return
+			}
 
 			// template paremeters
 			tmplvar = tmplvar_portscan{Ip: item.Source.Ip, Events: nil}
