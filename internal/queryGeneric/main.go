@@ -1,7 +1,6 @@
 package queryGeneric
 
 import (
-	"abuser/internal/queryAbusix"
 	"abuser/internal/queryRdap"
 	"abuser/internal/queryRipeStat"
 	"abuser/internal/utils"
@@ -16,10 +15,6 @@ func IpToAbuseC(ip netip.Addr) []string {
 
 	for _, asn := range queryRipeStat.IpToAsn(ip) {
 		abuseContacts = append(abuseContacts, queryRdap.AsnToAbuseC(asn)...)
-	}
-
-	if len(abuseContacts) == 0 { /* generic fallback, available for IPv4 only */
-		abuseContacts = queryAbusix.IpToAbuseC(ip)
 	}
 
 	// remove duplicates
