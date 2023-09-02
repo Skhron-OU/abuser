@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"strconv"
 )
 
 type apiResponse_data_asns struct {
@@ -31,6 +32,44 @@ type apiResponse struct {
 }
 
 func IpToAsn(ip netip.Addr) []string {
+	var irrAsns map[string]bool = ipToAsn_irr(ip)
+	var bgpAsns map[string]bool = ipToAsn_bgp(ip)
+
+	var asns []string
+	for asn := range bgpAsns {
+		if _, ok := irrAsns[asn]; ok {
+			asns = append(asns, asn)
+		}
+	}
+	return asns
+}
+
+func ipToAsn_bgp(ip netip.Addr) map[string]bool {
+	param := make(map[string]string)
+	param["resource"] = ip.String()
+
+	response, err := craftRequest("prefix-overview", param)
+	utils.HandleCriticalError(err)
+
+	response_json, err := ioutil.ReadAll(response.Body)
+	response.Body.Close()
+
+	var asns map[string]bool = make(map[string]bool)
+
+	if response.StatusCode != 200 {
+		return map[string]bool{}
+	}
+
+	var response_api apiResponse
+	json.Unmarshal(response_json, &response_api)
+
+	for _, asnObject := range response_api.Data.ASNs {
+		asns[strconv.Itoa(asnObject.ASN)] = true
+	}
+	return asns
+}
+
+func ipToAsn_irr(ip netip.Addr) map[string]bool {
 	param := make(map[string]string)
 	param["resource"] = ip.String()
 
@@ -43,7 +82,7 @@ func IpToAsn(ip netip.Addr) []string {
 	var asns map[string]bool = make(map[string]bool)
 
 	if response.StatusCode != 200 {
-		return []string{}
+		return map[string]bool{}
 	}
 
 	var response_api apiResponse
@@ -56,7 +95,7 @@ func IpToAsn(ip netip.Addr) []string {
 			}
 		}
 	}
-	return utils.Keys(asns)
+	return asns
 }
 
 func craftRequest(dataCall string, param map[string]string) (*http.Response, error) {
