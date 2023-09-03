@@ -22,10 +22,14 @@ func init() {
 }
 
 func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardProperty, emailType string) {
+	var processedEmail string
 	for _, property := range props {
 		if property.Name == "email" && property.Type == "text" {
 			if emailType == typeAny || utils.Index(property.Parameters["type"], emailType) != -1 {
-				(*abuseContacts)[strings.ToLower(fmt.Sprint(property.Value))] = true
+				processedEmail = fmt.Sprint(property.Value)
+				processedEmail = strings.TrimSpace(processedEmail)
+				processedEmail = strings.ToLower(processedEmail)
+				(*abuseContacts)[processedEmail] = true
 			}
 		}
 	}
