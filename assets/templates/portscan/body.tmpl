@@ -1,53 +1,26 @@
-******************************************************************************
-* WARNING!!! This is an automated message. All replies to this email will be *
-* seen by a real human. Please be sure to include this letter to your answer *
-******************************************************************************
+This is an automated abuse complaint regarding active TCP service probing (establishing multiple connections). All these connections are to dynamically located tarpit type honeypots and thus provide sufficiently reliable evidence to claim an ongoing port scan activity.
 
-To Whom It May Concern:
+This means the host behind IP address {{.Ip}} is either:
 
-There are different stateful traps on an unused IP addresses within our networks to detect network scans (or a network attacks) carried to the Internet-wide or explicitly targetting our infrastructure.
+- serves a public proxy/VPN;
+- participates in a botnet operation or another kind of malware;
+- a VPS used by an illicit actor to find vulnerable publicly exposed services (Telnet, SSH, MSSQL, elasticsearch and so on).
 
-The IP address {{.Ip}} has made a few connections to our TCP traps as provided in the logs section below. This means the host behind that IP address is either infected with a virus, participates in a botnet, or performs Internet-wide research.
+We insist that you and/or your end-user will take all necessary actions to resolve the current issue. If you are an established VPN provider with zero-log policy, please let us know about that, so we will be able to whitelist you.
 
-Whatever the reason is for this behaviour for IP address {{.Ip}}, we urge you to cease and desist this kind of activity. Otherwise this IP address will be blackholed for prolonged period of time within our networks.
+**We are a hosting provider Skhron, please DO NOT block any of our single IP address or entire blocks!**
 
-If you are a security researcher, please add the following ranges to your blacklist:
+Wish to stop receiving such messages (are you a security researcher)? Please reply to this message - all replies are processed manually.
 
- - 88.218.206.0/24
- - 2a09:b280:fe00::/48
+Incident details are attached below:
 
-Otherwise we insist that you and/or your end-user will take all necessary actions to avoid this in the future and to resolve the current issue.
-
-# Why your email address was added to the recipient list?
-
-Our automated toolset tries to lookup **validated** email addresses in the following way:
-
-Firstly, abuse mailboxes for both IP address and Autonomous System (AS) to ensure the deliverability of the complaint to an appropriate party.
-Secondly, if no abuse mailboxes were discovered, all emails from abuse contacts entities for both IP address and AS are used.
-Thirdly, if there is still no email addresses discovered, all discovered emails for both IP address and AS are used.
-
-Our interaction with RIR databases are done solely via Registration Data Access Protocol (RDAP) which is the machine-readable successor to WHOIS. As you can see at [1], RDAP is supported by all RIRs and thus is a reliable source of data.
-
-Please note that by validated email address we mean one that is not marked as invalid by RIR. For example, ARIN uses remark with a title "Unvalidated POC" to mark contact entity. Please be sure to fix this issue with them before blaiming us of using wrong contact details.
-
-# Notes
-
-Please note that you should get this message at most only a few minutes after the incident. For your reference, all provided timestamps are in Coordinated Universal Time (UTC).
-
-If you have any questions, please send them to us by responding to this email. Please be sure to include this letter in further correspondence to make it easy for us to assist you within the current case.
-
-# Logs
-
--------------------------------------------------------------------------------
--           Log of port scans verified by a TCP three-way handshake           -
--------------------------------------------------------------------------------
 Timestamp                SrcIP            SrcPort DstIP            DstPort{{range .Events}}
 {{printf "%-24s" .Timestamp}} {{printf "%-16s" .SrcIp}} {{printf "%-5d" .SrcPort}}   {{printf "%-16s" .DstIp}} {{printf "%-5d" .DstPort}}{{end}}
 -------------------------------------------------------------------------------
 
-# Links
+This table contains established TCP connections (ones confirmed using 3WHS - three way handshake, which makes our data not vulnerable to an IP spoofing attack). These events cannot be forged and can be reliably verified even if you use sampled network monitoring, for example, with sFlow.
 
-[1]: https://www.iana.org/assignments/as-numbers/as-numbers.txt
+Please do not hesitate to reply to this letter if you have any questions or concerns regarding the current case.
 
 Kind regards,
 Network department
