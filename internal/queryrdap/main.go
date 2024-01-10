@@ -1,14 +1,18 @@
-package queryRdap
+package queryrdap
 
 import (
-	l "abuser/internal/logger"
-	"abuser/internal/queryError"
+	"abuser/internal/queryerror"
 	"abuser/internal/utils"
+	"errors"
 	"fmt"
 	"net/netip"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
+
+	l "abuser/internal/logger"
 
 	"github.com/openrdap/rdap"
 )
@@ -35,10 +39,39 @@ func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardPropert
 	}
 }
 
-func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactType string) {
+func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, links *[]rdap.Link, contactType string) {
 	// process child Entities if any
-	for _, entityChild := range entity.Entities {
-		loopEntity(abuseContacts, &entityChild, contactType)
+	for i := range entity.Entities {
+		loopEntity(abuseContacts, &entity.Entities[i], links, contactType)
+	}
+
+	var err error
+	client := &rdap.Client{}
+
+	// do additional query for this entity if RIR didn't include contact details for some reason
+	if entity.VCard == nil && len(*links) > 0 && entity.Handle != "" {
+		entityRequest := rdap.NewEntityRequest(entity.Handle)
+		for _, link := range *links {
+			if link.Rel == "self" {
+				entityRequest.Server, err = url.Parse(link.Href)
+				entityRequest.Server.Path = ""
+				if err != nil {
+					break
+				}
+
+				var entityResponse *rdap.Response
+				for i := 0; i == 0 || (i < 5 && err != nil); i++ {
+					entityResponse, err = client.Do(entityRequest)
+					if isClientError(rdap.ObjectDoesNotExist, err) {
+						break
+					}
+					time.Sleep(time.Second * time.Duration((i+1)*2))
+				}
+
+				entity.VCard = entityResponse.Object.(*rdap.Entity).VCard
+				break
+			}
+		}
 	}
 
 	// skip invalid contacts
@@ -58,27 +91,33 @@ func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactType
 
 	// process root Entity
 	if entity.VCard != nil {
-		if contactType == "abuseMailbox" { /* no matter what entity role is, lookup abuse-mailbox */
+		switch contactType {
+		case "abuseMailbox":
+			/* no matter what entity role is, lookup abuse-mailbox */
 			mailboxCollector(abuseContacts, entity.VCard.Properties, "abuse")
-		} else if contactType == "abuseContact" { /* lookup all emails from entity with role of abuse */
+			break
+		case "abuseContact":
+			/* lookup all emails from entity with role of abuse */
 			if utils.Index(entity.Roles, "abuse") != -1 {
 				mailboxCollector(abuseContacts, entity.VCard.Properties, typeAny)
 			}
-		} else { /* fallback mode, gather all available emails */
+			break
+		default:
+			/* fallback mode, gather all available emails */
 			mailboxCollector(abuseContacts, entity.VCard.Properties, typeAny)
 		}
 	}
 }
 
-func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
-	for _, entity := range *entities {
-		loopEntity(abuseContacts, &entity, "abuseMailbox")
+func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity, links *[]rdap.Link) {
+	for i := range *entities {
+		loopEntity(abuseContacts, &(*entities)[i], links, "abuseMailbox")
 	}
 
 	for _, contactType := range []string{"abuseContact", typeAny} {
 		if len(*abuseContacts) == 0 {
-			for _, entity := range *entities {
-				loopEntity(abuseContacts, &entity, contactType)
+			for i := range *entities {
+				loopEntity(abuseContacts, &(*entities)[i], links, contactType)
 			}
 		} else {
 			break
@@ -94,18 +133,17 @@ func remarkProcessor(abuseContacts *map[string]bool, remarks *[]rdap.Remark, ent
 			for _, email := range emails {
 				(*abuseContacts)[email] = true
 			}
-			emails = nil
 		}
 	}
 
-	for _, entity := range *entities {
-		remarkProcessor(abuseContacts, &entity.Remarks, &entity.Entities)
+	for i := range *entities {
+		remarkProcessor(abuseContacts, &(*entities)[i].Remarks, &(*entities)[i].Entities)
 	}
 }
 
-// copied from openrdap/rdap/client_error.go...
 func isClientError(t rdap.ClientErrorType, err error) bool {
-	if ce, ok := err.(*rdap.ClientError); ok {
+	var ce rdap.ClientError
+	if errors.As(err, &ce) {
 		if ce.Type == t {
 			return true
 		}
@@ -114,7 +152,7 @@ func isClientError(t rdap.ClientErrorType, err error) bool {
 	return false
 }
 
-func IpToAbuseC(ip netip.Addr) ([]string, error) {
+func IPAddrToAbuseC(ip netip.Addr) ([]string, error) {
 	var err error
 	var ipMeta *rdap.IPNetwork
 
@@ -123,20 +161,20 @@ func IpToAbuseC(ip netip.Addr) ([]string, error) {
 	for i := 0; i == 0 || (i < 5 && err != nil); i++ {
 		ipMeta, err = client.QueryIP(ip.String())
 		if isClientError(rdap.ObjectDoesNotExist, err) {
-			return nil, queryError.BogonResource
+			return nil, queryerror.ErrBogonResource
 		}
 
-		time.Sleep(time.Second * time.Duration(i*2))
+		time.Sleep(time.Second * time.Duration((i+1)*2))
 	}
 
-	var abuseContacts map[string]bool = make(map[string]bool, 0)
+	var abuseContacts = make(map[string]bool, 0)
 
 	if err == nil {
 		if ipMeta.Type == "ALLOCATED UNSPECIFIED" {
-			return nil, queryError.BogonResource
+			return nil, queryerror.ErrBogonResource
 		}
 
-		metaProcessor(&abuseContacts, &ipMeta.Entities)
+		metaProcessor(&abuseContacts, &ipMeta.Entities, &ipMeta.Links)
 
 		// try to extract email from remarks... -_-
 		if len(abuseContacts) == 0 {
@@ -145,8 +183,6 @@ func IpToAbuseC(ip netip.Addr) ([]string, error) {
 
 		if ipMeta.Country == "BR" { // they wish to receive copies of complaints
 			abuseContacts["cert@cert.br"] = true
-		} else if ipMeta.Country == "IN" {
-			abuseContacts["incident@cert-in.org.in"] = true
 		}
 	} else {
 		l.Logger.Printf("[%s] RDAP query failed: %s\n", ip.String(), err.Error())
@@ -155,32 +191,32 @@ func IpToAbuseC(ip netip.Addr) ([]string, error) {
 	return utils.Keys(abuseContacts), nil
 }
 
-func AsnToAbuseC(asn string) ([]string, error) {
+func AsnToAbuseC(asn uint) ([]string, error) {
 	var err error
 	var asnMeta *rdap.Autnum
 
 	client := &rdap.Client{UserAgent: "SkhronAbuseComplaintSender"}
 
 	for i := 0; i == 0 || (i < 5 && err != nil); i++ {
-		asnMeta, err = client.QueryAutnum(asn)
+		asnMeta, err = client.QueryAutnum(strconv.Itoa(int(asn)))
 		if isClientError(rdap.ObjectDoesNotExist, err) {
-			return nil, queryError.BogonResource
+			return nil, queryerror.ErrBogonResource
 		}
 
 		time.Sleep(time.Second * time.Duration(i*2))
 	}
 
-	var abuseContacts map[string]bool = make(map[string]bool, 0)
+	var abuseContacts = make(map[string]bool, 0)
 
 	if err == nil {
-		metaProcessor(&abuseContacts, &asnMeta.Entities)
+		metaProcessor(&abuseContacts, &asnMeta.Entities, &asnMeta.Links)
 
 		// try to extract email from remarks... -_-
 		if len(abuseContacts) == 0 {
 			remarkProcessor(&abuseContacts, &asnMeta.Remarks, &asnMeta.Entities)
 		}
 	} else {
-		l.Logger.Printf("[%s] RDAP query failed: %s\n", asn, err.Error())
+		l.Logger.Printf("[%d] RDAP query failed: %s\n", asn, err.Error())
 	}
 
 	return utils.Keys(abuseContacts), nil

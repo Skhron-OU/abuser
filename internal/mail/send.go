@@ -1,7 +1,6 @@
 package mail
 
 import (
-	l "abuser/internal/logger"
 	"abuser/internal/utils"
 	"crypto/tls"
 	"fmt"
@@ -9,6 +8,8 @@ import (
 	"net/smtp"
 	"strings"
 	"time"
+
+	l "abuser/internal/logger"
 )
 
 type SMTP struct {
@@ -32,7 +33,7 @@ type Email struct {
 
 const retryAttempts = 10
 
-var errsTemporary []string = []string{
+var errsTemporary = []string{
 	"try later",
 	"try again later",
 	"temporarily deferred",
@@ -46,6 +47,7 @@ var errsTemporary []string = []string{
 
 func (email *Email) Send(creds SMTP, attempt uint) {
 	tlsConnonfig := &tls.Config{
+		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: false,
 		ServerName:         creds.Host,
 	}
@@ -88,7 +90,7 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 
 	// acknowledge who are the recipients for SMTP server
 	recipientCount := len(email.EnvelopeTo)
-	var acceptedRecipients []string = nil
+	var acceptedRecipients []string
 	for _, recipient := range email.EnvelopeTo {
 		err = smtpConn.Rcpt(recipient)
 
@@ -100,7 +102,7 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 			// TODO: consider matching on SMTP error codes instead?
 			isTemporary := false
 			for _, temporaryErrStr := range errsTemporary {
-				isTemporary = isTemporary || (strings.Index(errStr, temporaryErrStr) != -1)
+				isTemporary = isTemporary || strings.Contains(errStr, temporaryErrStr)
 				if isTemporary {
 					break
 				}
@@ -160,6 +162,8 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 	}
 
 	// appropriately end our communication with the server
-	smtpConn.Quit()
+	err = smtpConn.Quit()
+	utils.HandleCriticalError(err)
+
 	tlsConn.Close()
 }

@@ -1,8 +1,7 @@
 package main
 
 import (
-	l "abuser/internal/logger"
-	"abuser/internal/queryGeneric"
+	"abuser/internal/querygeneric"
 	"abuser/internal/reporter"
 	"abuser/internal/utils"
 	"encoding/json"
@@ -10,19 +9,21 @@ import (
 	"net/http"
 	"net/netip"
 	"strconv"
+
+	l "abuser/internal/logger"
 )
 
-type __portscan_event struct {
-	SrcIp     string // compatibility with Body template
+type _PortscanEvent struct {
+	SrcIP     string // compatibility with Body template
 	SrcPort   uint16
-	DstIp     string
+	DstIP     string
 	DstPort   uint16
 	Timestamp string
 }
 
-type tmplvar_portscan struct {
-	Ip     string // compatibility with Subject template
-	Events []__portscan_event
+type tmplvarPortscan struct {
+	IP     string // compatibility with Subject template
+	Events []_PortscanEvent
 }
 
 type crowdsecEvent struct {
@@ -36,7 +37,7 @@ type crowdsecEventMeta struct {
 }
 
 type crowdsecSource struct {
-	Ip string `json:"ip"`
+	IP string `json:"ip"`
 }
 
 type WebhookCrowdsec struct {
@@ -44,7 +45,7 @@ type WebhookCrowdsec struct {
 	Source crowdsecSource  `json:"source"`
 }
 
-func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
+func webhookCrowdsec(_ http.ResponseWriter, r *http.Request) {
 	jsonBody, err := ioutil.ReadAll(r.Body)
 	r.Body.Close()
 	utils.HandleCriticalError(err)
@@ -54,41 +55,46 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 	utils.HandleCriticalError(err)
 
 	var abuseContacts []string
-	var bogonStatus queryGeneric.BogonStatus
+	var bogonStatus querygeneric.BogonStatus
 
-	var tmplvar tmplvar_portscan
-	var __event __portscan_event
+	var tmplvar tmplvarPortscan
+	var _Event _PortscanEvent
 
 	go func() {
 		for _, item := range parsedBody {
-			ipAddr := netip.MustParseAddr(item.Source.Ip)
+			ipAddr := netip.MustParseAddr(item.Source.IP)
 
-			abuseContacts, bogonStatus = queryGeneric.IpToAbuseC(ipAddr)
-			if bogonStatus.IsIpBogon && bogonStatus.IsNoValidAs {
+			abuseContacts, bogonStatus = querygeneric.IPAddrToAbuseC(ipAddr)
+			if bogonStatus.IsBogonIP || len(bogonStatus.BogonsAS) > 0 {
 				// TODO: handle bogons and report them accordingly
-				l.Logger.Printf("[%s] Bogon resource! Bogon reports are currently not implemented, skipping.\n", item.Source.Ip)
+				l.Logger.Printf("[%s] Bogon resource! Bogon reports are currently not implemented, skipping.\n", item.Source.IP)
 				return
 			}
 
 			// template paremeters
-			tmplvar = tmplvar_portscan{Ip: item.Source.Ip, Events: nil}
+			tmplvar = tmplvarPortscan{IP: item.Source.IP, Events: nil}
 
 			for _, event := range item.Events {
-				__event.Timestamp = event.Timestamp
+				_Event.Timestamp = event.Timestamp
 				for _, meta := range event.Meta {
-					if meta.Key == "source_port" {
+					switch meta.Key {
+					case "source_port":
 						srcPort, _ := strconv.ParseUint(meta.Value, 10, 16)
-						__event.SrcPort = uint16(srcPort)
-					} else if meta.Key == "source_ip" {
-						__event.SrcIp = meta.Value
-					} else if meta.Key == "destination_port" {
-						srcPort, _ := strconv.ParseUint(meta.Value, 10, 16)
-						__event.DstPort = uint16(srcPort)
-					} else if meta.Key == "destination_ip" {
-						__event.DstIp = meta.Value
+						_Event.SrcPort = uint16(srcPort)
+						break
+					case "source_ip":
+						_Event.SrcIP = meta.Value
+						break
+					case "destination_port":
+						dstPort, _ := strconv.ParseUint(meta.Value, 10, 16)
+						_Event.DstPort = uint16(dstPort)
+						break
+					case "destination_ip":
+						_Event.DstIP = meta.Value
+						break
 					}
 				}
-				tmplvar.Events = append(tmplvar.Events, __event)
+				tmplvar.Events = append(tmplvar.Events, _Event)
 			}
 
 			reporter.Report(abuseContacts, ipAddr, tmplvar, "portscan")
@@ -99,7 +105,7 @@ func webhookCrowdsec(w http.ResponseWriter, r *http.Request) {
 func main() {
 	l.Logger.Println("listening 127.0.0.1:8888")
 
-	// start HTTP server
 	http.HandleFunc("/webhook/crowdsec", webhookCrowdsec)
-	http.ListenAndServe("127.0.0.1:8888", nil)
+	err := http.ListenAndServe("127.0.0.1:8888", nil) // #nosec G114
+	panic(err)
 }

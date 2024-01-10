@@ -1,26 +1,38 @@
-This is an automated abuse complaint regarding active TCP service probing (establishing multiple connections). All these connections are to dynamically located tarpit type honeypots and thus provide sufficiently reliable evidence to claim an ongoing port scan activity.
+This is an automated abuse complaint regarding active TCP service probing
+(establishing multiple connections). All these connections are to dynamically
+located tarpit type honeypots and thus provide sufficiently reliable evidence
+to claim an ongoing port scan activity.
 
-This means the host behind IP address {{.Ip}} is either:
+This means the host behind IP address {{.IP}} is either:
 
 - serves a public proxy/VPN;
 - participates in a botnet operation or another kind of malware;
-- a VPS used by an illicit actor to find vulnerable publicly exposed services (Telnet, SSH, MSSQL, elasticsearch and so on).
+- a VPS used by an illicit actor to find vulnerable publicly exposed services
+  (Telnet at 23/tcp, Samba at 445/tcp, FTP at 21/tcp, SSH at 22/tcp and so on).
 
-We insist that you and/or your end-user will take all necessary actions to resolve the current issue. If you are an established VPN provider with zero-log policy, please let us know about that, so we will be able to whitelist you.
+We insist that you and/or your end-user will take all necessary actions to
+resolve the current issue. If you are an established VPN provider with zero-log
+policy, please let us know about that, so we will be able to whitelist you.
 
-**We are a hosting provider Skhron, please DO NOT block any of our single IP address or entire blocks!**
+**We are a hosting provider Skhron, please DO NOT block any of our single IP
+address or entire blocks!**
 
-Wish to stop receiving such messages (are you a security researcher)? Please reply to this message - all replies are processed manually.
+Wish to stop receiving such messages (are you a security researcher)? Please
+reply to this message - all replies are processed manually.
 
 Incident details are attached below:
 
 Timestamp                SrcIP            SrcPort DstIP            DstPort{{range .Events}}
-{{printf "%-24s" .Timestamp}} {{printf "%-16s" .SrcIp}} {{printf "%-5d" .SrcPort}}   {{printf "%-16s" .DstIp}} {{printf "%-5d" .DstPort}}{{end}}
+{{printf "%-24s" .Timestamp}} {{printf "%-16s" .SrcIP}} {{printf "%-5d" .SrcPort}}   {{printf "%-16s" .DstIP}} {{printf "%-5d" .DstPort}}{{end}}
 -------------------------------------------------------------------------------
 
-This table contains established TCP connections (ones confirmed using 3WHS - three way handshake, which makes our data not vulnerable to an IP spoofing attack). These events cannot be forged and can be reliably verified even if you use sampled network monitoring, for example, with sFlow.
+This table contains established TCP connections (ones confirmed using 3WHS -
+three way handshake, which makes our data not vulnerable to an IP spoofing
+attack). These events cannot be forged and can be reliably verified even if you
+use sampled network monitoring, for example, with sFlow.
 
-Please do not hesitate to reply to this letter if you have any questions or concerns regarding the current case.
+Please do not hesitate to reply to this letter if you have any questions or
+concerns regarding the current case.
 
 Kind regards,
 Network department

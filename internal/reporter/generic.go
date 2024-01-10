@@ -1,22 +1,31 @@
 package reporter
 
 import (
-	l "abuser/internal/logger"
 	"abuser/internal/mail"
 	"abuser/internal/utils"
-	"abuser/internal/webReport"
+	"abuser/internal/webreport"
 	"bytes"
 	"net/netip"
 	"os"
 	"strings"
 	"text/template"
+
+	l "abuser/internal/logger"
 )
 
 var templateMap map[string]map[string]*template.Template
 
-var reportMap map[string]string = map[string]string{
+// TODO: do not hardcode these?
+var reportMap = map[string]string{
 	"abuse@ovh.ca":  "blackhole", // abuse@ovh.net is present always, no need to report it twice
 	"abuse@ovh.net": "web/ovh",
+	// temporary disabled, TODO xarf support
+	"abuse@digitalocean.com": "blackhole", //"web/digitalocean",
+	"noc@digitalocean.com":   "blackhole", //"web/digitalocean",
+	// temporary, reach out apnic
+	"helpdesk@apnic.net": "blackhole",
+	// are ignoring portscan: "We cannot meaningfully process complaints about an IP simply looking at a port."
+	"abuse@lightedge.com": "blackhole",
 }
 
 func init() {
@@ -39,8 +48,7 @@ func init() {
 
 				if !templateFile.IsDir() {
 					templateFilename := baseDir + categoryName + "/" + templateFile.Name()
-					templateMap[categoryName][templateName], _ =
-						template.ParseFiles(templateFilename)
+					templateMap[categoryName][templateName], _ = template.ParseFiles(templateFilename)
 				}
 			}
 		}
@@ -50,42 +58,52 @@ func init() {
 func Report(recipientsEmail []string, attacker netip.Addr, details interface{}, category string) {
 	buf := &bytes.Buffer{}
 
+	var err error
 	var title, body string
 
-	tmpl_map, prs := templateMap[category]
+	tmplMap, prs := templateMap[category]
 	if !prs {
 		l.Logger.Printf("Category %s is not available\n", category)
 		return
 	}
 
-	tmpl_title, prs := tmpl_map["subject"]
+	tmplTitle, prs := tmplMap["subject"]
 	if !prs {
 		l.Logger.Printf("No title template present for %s category\n", category)
 		return
 	}
 
-	tmpl_body, prs := tmpl_map["body"]
+	tmplBody, prs := tmplMap["body"]
 	if !prs {
 		l.Logger.Printf("No body template present for %s category\n", category)
 		return
 	}
 
 	buf.Reset()
-	tmpl_title.Execute(buf, details)
+	err = tmplTitle.Execute(buf, details)
+	utils.HandleCriticalError(err)
 	title = strings.TrimSpace(buf.String())
 
 	buf.Reset()
-	tmpl_body.Execute(buf, details)
+	err = tmplBody.Execute(buf, details)
+	utils.HandleCriticalError(err)
 	body = strings.TrimSpace(buf.String())
 
 	var legacyRecipients []string
 	for _, recipientEmail := range recipientsEmail {
 		reportMethod, prs := reportMap[recipientEmail]
 		if prs {
-			if reportMethod == "blackhole" {
+			switch reportMethod {
+			case "web/ovh":
+				webreport.ToOVH(category, attacker, body, os.Getenv("SMTP_SENDER"))
+				break
+			case "web/digitalocean":
+				webreport.ToDigitalOcean(category, attacker, body, os.Getenv("SMTP_SENDER"))
+				break
+			case "blackhole":
+			default:
 				// just skip the blackholed address
-			} else if reportMethod == "web/ovh" {
-				webReport.ToOVH(category, attacker, body, os.Getenv("SMTP_SENDER"))
+				break
 			}
 		} else {
 			// they will receive email letter
@@ -93,13 +111,13 @@ func Report(recipientsEmail []string, attacker netip.Addr, details interface{}, 
 		}
 	}
 
-	var emailCreds mail.SMTP
-	emailCreds = mail.SMTP{
+	emailCreds := mail.SMTP{
 		Helo: os.Getenv("SMTP_HELO"),
 		Host: os.Getenv("SMTP_HOST"),
 		User: os.Getenv("SMTP_USER"),
 		Pass: os.Getenv("SMTP_PASS"),
-		Port: 465}
+		Port: 465,
+	}
 
 	if len(legacyRecipients) > 0 {
 		email := mail.Email{EnvelopeFrom: os.Getenv("SMTP_ENVELOPEFROM")}
