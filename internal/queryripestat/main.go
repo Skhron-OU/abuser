@@ -68,7 +68,7 @@ func IPAddrToAS(ip netip.Addr) []uint {
 	asnsBgp, mostSpecificPrefix := routingConsistency(ip)
 
 	if mostSpecificPrefix == nil {
-		l.Logger.Printf("mostSpecificPrefix is nil, should not happen!\n")
+		l.Logger.Printf("[%s] mostSpecificPrefix is nil, should not happen!\n", ip.String())
 		return utils.Keys(asnsBgp)
 	}
 

@@ -158,7 +158,7 @@ func IPAddrToAbuseC(ip netip.Addr) ([]string, error) {
 
 	client := &rdap.Client{UserAgent: "SkhronAbuseComplaintSender"}
 
-	for i := 0; i == 0 || (i < 5 && err != nil); i++ {
+	for i := 0; i == 0 || (i < 10 && err != nil); i++ {
 		ipMeta, err = client.QueryIP(ip.String())
 		if isClientError(rdap.ObjectDoesNotExist, err) {
 			return nil, queryerror.ErrBogonResource

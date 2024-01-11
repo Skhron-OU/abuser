@@ -158,7 +158,6 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 		// reset mail transaction because we have no recipients
 		err := smtpConn.Reset()
 		utils.HandleCriticalError(err)
-		l.Logger.Printf("[%s] The letter has no valid recipients\n", email.Headers["Subject"])
 	}
 
 	// appropriately end our communication with the server
