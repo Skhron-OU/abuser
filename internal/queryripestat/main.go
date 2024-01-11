@@ -3,6 +3,7 @@ package queryripestat
 import (
 	"abuser/internal/utils"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/netip"
@@ -35,12 +36,12 @@ type apiResponseDataRoute struct {
 }
 
 type apiResponseData struct {
-	AbuseContacts []string                    `json:"abuse_contacts"`
-	ASNs           []apiResponseDataAsns     `json:"asns"`
+	AbuseContacts []string                  `json:"abuse_contacts"`
+	ASNs          []apiResponseDataAsns     `json:"asns"`
 	IRRRecords    [][]apiResponseDataRecord `json:"irr_records"`
 	BGPState      []apiResponseDataBgpstate `json:"bgp_state"`
-	NRRoutes      uint                        `json:"nr_routes"`
-	Routes         []apiResponseDataRoute    `json:"routes"`
+	NRRoutes      uint                      `json:"nr_routes"`
+	Routes        []apiResponseDataRoute    `json:"routes"`
 }
 
 type apiResponseRoa []struct {
@@ -49,9 +50,11 @@ type apiResponseRoa []struct {
 }
 
 type apiResponse[T any] struct {
-	Data     T      `json:"data"`
-	QueryID string `json:"query_id"`
-	Status   string `json:"status"`
+	Data           T      `json:"data"`
+	DataCallStatus string `json:"data_call_status"`
+	QueryID        string `json:"query_id"`
+	Status         string `json:"status"`
+	Message        string `json:"message"`
 }
 
 type BgpState struct {
@@ -104,14 +107,9 @@ func prefixRoa(net netip.Prefix, asnsRaw []uint) map[uint]bool {
 	asnsStr = append(asnsStr, "0") // ensure that we always receive at least two entries
 	param["resources"] = strings.Join(asnsStr, ",")
 
-	response, err := craftRequest("rpki-validation", param)
-	utils.HandleCriticalError(err)
-
-	responseJSON, _ := ioutil.ReadAll(response.Body)
-	response.Body.Close()
-
+	responseJSON, err := craftRequest("rpki-validation", param)
 	asnsValid := make(map[uint]bool, 0)
-	if response.StatusCode != 200 {
+	if err != nil {
 		return asnsValid
 	}
 
@@ -132,13 +130,8 @@ func routingConsistency(ip netip.Addr) (map[uint]RoutingConsistency, *netip.Pref
 	param := make(map[string]string)
 	param["resource"] = ip.String()
 
-	response, err := craftRequest("prefix-routing-consistency", param)
-	utils.HandleCriticalError(err)
-
-	responseJSON, _ := ioutil.ReadAll(response.Body)
-	response.Body.Close()
-
-	if response.StatusCode != 200 {
+	responseJSON, err := craftRequest("prefix-routing-consistency", param)
+	if err != nil {
 		return map[uint]RoutingConsistency{}, nil
 	}
 
@@ -170,13 +163,9 @@ func AnalyzeBgpState(ip netip.Addr) BgpState {
 	param := make(map[string]string)
 	param["resource"] = ip.String()
 
-	response, err := craftRequest("bgp-state", param)
-	utils.HandleCriticalError(err)
+	responseJSON, err := craftRequest("bgp-state", param)
 
-	responseJSON, _ := ioutil.ReadAll(response.Body)
-	response.Body.Close()
-
-	if response.StatusCode != 200 {
+	if err != nil {
 		return BgpState{}
 	}
 
@@ -223,7 +212,7 @@ func AnalyzeBgpState(ip netip.Addr) BgpState {
 	return BgpState{Origin: utils.Keys(origins), Upstream: utils.Keys(upstreams)}
 }
 
-func craftRequest(dataCall string, param map[string]string) (*http.Response, error) {
+func craftRequest(dataCall string, param map[string]string) ([]byte, error) {
 	apiURL, _ := url.Parse("https://stat.ripe.net/data/" + dataCall + "/data.json")
 	param["sourceapp"] = "SkhronAbuseComplaintSender"
 
@@ -239,5 +228,26 @@ func craftRequest(dataCall string, param map[string]string) (*http.Response, err
 		return nil, err
 	}
 
-	return response, nil
+	// if response.StatusCode != 200 {
+	// 	l.Logger.Printf("[dataCall:%s, param:%+v] HTTP status code: %d\n", dataCall, param, response.StatusCode)
+	// }
+
+	responseJSON, err := ioutil.ReadAll(response.Body)
+	response.Body.Close()
+	utils.HandleCriticalError(err)
+
+	var responseAPI apiResponse[json.RawMessage]
+	err = json.Unmarshal(responseJSON, &responseAPI)
+	utils.HandleCriticalError(err)
+
+	if responseAPI.Status != "ok" {
+		l.Logger.Printf("[dataCall:%s, param:%+v] Status: %s\n", dataCall, param, responseAPI.Status)
+		return nil, errors.New(responseAPI.Message)
+	}
+
+	if !strings.HasPrefix(responseAPI.DataCallStatus, "supported") {
+		l.Logger.Printf("[dataCall:%s, param:%+v] DataCallStatus: %s\n", dataCall, param, responseAPI.DataCallStatus)
+	}
+
+	return responseJSON, nil
 }
