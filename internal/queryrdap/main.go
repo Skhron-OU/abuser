@@ -7,29 +7,45 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	l "abuser/internal/logger"
 
+	"github.com/gammazero/deque"
 	"github.com/openrdap/rdap"
 )
 
-const typeAny = "*any*"
+const (
+	emailTypeAny   = "*any*"
+	emailTypeAbuse = "abuse"
 
+	contactTypeAbuseStrict = "abuseContactAbuseMailbox"
+	contactTypeAny         = "abuseMailbox"
+	contactTypeAbuseLoose  = "abuseContact"
+)
+
+/* FIXME: dead code
 var emailRegexp *regexp.Regexp
 
 func init() {
 	emailRegexp = regexp.MustCompile("(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\\])")
 }
+*/
 
 func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardProperty, emailType string) {
-	var processedEmail string
+	var (
+		processedEmail string
+		isMatchingProp bool
+	)
+
 	for _, property := range props {
 		if property.Name == "email" && property.Type == "text" {
-			if emailType == typeAny || utils.Index(property.Parameters["type"], emailType) != -1 {
+			isMatchingProp = (emailType == emailTypeAny || utils.Index(property.Parameters["type"], emailType) != -1 || // generic
+				(emailType == emailTypeAbuse && utils.Index(property.Parameters["pref"], "1") != -1)) // APNIC specific
+
+			if isMatchingProp {
 				processedEmail = fmt.Sprint(property.Value)
 				processedEmail = strings.TrimSpace(processedEmail)
 				processedEmail = strings.ToLower(processedEmail)
@@ -39,10 +55,18 @@ func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardPropert
 	}
 }
 
-func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, links *[]rdap.Link, contactType string) {
-	// process child Entities if any
-	for i := range entity.Entities {
-		loopEntity(abuseContacts, &entity.Entities[i], links, contactType)
+func processEntity(abuseContacts *map[string]bool, entity *rdap.Entity, links *[]rdap.Link, contactType string) {
+	// resolve only bare minimum of contacts
+	if len(*abuseContacts) > 0 {
+		return
+	}
+
+	// They do not wish to hear anything about abuse complaints:
+	// "Please note that CNNIC is not an ISP and is not empowered to
+	// investigate complaints of network abuse. Please contact the tech-c
+	// or admin-c of the network."
+	if entity.Handle == "IRT-CNNIC-CN" {
+		return
 	}
 
 	var err error
@@ -61,11 +85,12 @@ func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, links *[]rd
 
 				var entityResponse *rdap.Response
 				for i := 0; i == 0 || (i < 5 && err != nil); i++ {
+					time.Sleep(time.Second * time.Duration(i*5))
+
 					entityResponse, err = client.Do(entityRequest)
 					if isClientError(rdap.ObjectDoesNotExist, err) {
 						break
 					}
-					time.Sleep(time.Second * time.Duration((i+1)*2))
 				}
 
 				entity.VCard = entityResponse.Object.(*rdap.Entity).VCard
@@ -79,45 +104,66 @@ func loopEntity(abuseContacts *map[string]bool, entity *rdap.Entity, links *[]rd
 		if remark.Title == "Unvalidated POC" { // ARIN-specific
 			return
 		}
-
-		for _, description := range remark.Description {
-			if strings.HasSuffix(description, " is invalid") { // APNIC-specific
-				return
-			} else if description == "Please contact the tech-c or admin-c of the network." { // CNNIC warning
-				return
-			}
-		}
 	}
 
 	// process root Entity
 	if entity.VCard != nil {
 		switch contactType {
-		case "abuseMailbox":
-			/* no matter what entity role is, lookup abuse-mailbox */
-			mailboxCollector(abuseContacts, entity.VCard.Properties, "abuse")
-			break
-		case "abuseContact":
-			/* lookup all emails from entity with role of abuse */
+		case contactTypeAbuseStrict:
+			/* entity role abuse, lookup abuse-mailbox */
 			if utils.Index(entity.Roles, "abuse") != -1 {
-				mailboxCollector(abuseContacts, entity.VCard.Properties, typeAny)
+				mailboxCollector(abuseContacts, entity.VCard.Properties, emailTypeAbuse)
 			}
 			break
+		case contactTypeAny:
+			/* no matter what entity role is, lookup abuse-mailbox */
+			mailboxCollector(abuseContacts, entity.VCard.Properties, emailTypeAbuse)
+			break
+		case contactTypeAbuseLoose:
+			/* lookup all emails from entity with role of abuse */
+			if utils.Index(entity.Roles, "abuse") != -1 {
+				mailboxCollector(abuseContacts, entity.VCard.Properties, emailTypeAny)
+			}
+			break
+		case emailTypeAny:
 		default:
 			/* fallback mode, gather all available emails */
-			mailboxCollector(abuseContacts, entity.VCard.Properties, typeAny)
+			/* FIXME: disabled due to triggering Spamhaus DBL
+			mailboxCollector(abuseContacts, entity.VCard.Properties, emailTypeAny)
+			*/
+		}
+	}
+
+	// remove invalid contacts
+	for _, remark := range entity.Remarks {
+		for _, description := range remark.Description {
+			// APNIC-specific
+			invalidEmail := strings.Replace(description, " is invalid", "", 1)
+			if _, ok := (*abuseContacts)[invalidEmail]; ok { // APNIC-specific
+				delete((*abuseContacts), invalidEmail)
+			}
 		}
 	}
 }
 
 func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity, links *[]rdap.Link) {
-	for i := range *entities {
-		loopEntity(abuseContacts, &(*entities)[i], links, "abuseMailbox")
-	}
+	var (
+		q      deque.Deque[*rdap.Entity]
+		entity *rdap.Entity
+	)
 
-	for _, contactType := range []string{"abuseContact", typeAny} {
+	for _, contactType := range []string{contactTypeAbuseStrict, contactTypeAny, contactTypeAbuseLoose, emailTypeAny} {
 		if len(*abuseContacts) == 0 {
 			for i := range *entities {
-				loopEntity(abuseContacts, &(*entities)[i], links, contactType)
+				q.PushBack(&(*entities)[i])
+			}
+
+			for q.Len() != 0 {
+				entity = q.PopFront()
+				processEntity(abuseContacts, entity, links, contactType)
+				for i := range entity.Entities {
+					q.PushBack(&(*&entity.Entities)[i])
+				}
 			}
 		} else {
 			break
@@ -125,6 +171,7 @@ func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity, link
 	}
 }
 
+/* FIXME: fallback is unused now, this is a dead code
 func remarkProcessor(abuseContacts *map[string]bool, remarks *[]rdap.Remark, entities *[]rdap.Entity) {
 	var emails []string
 	for _, remark := range *remarks {
@@ -140,6 +187,7 @@ func remarkProcessor(abuseContacts *map[string]bool, remarks *[]rdap.Remark, ent
 		remarkProcessor(abuseContacts, &(*entities)[i].Remarks, &(*entities)[i].Entities)
 	}
 }
+*/
 
 func isClientError(t rdap.ClientErrorType, err error) bool {
 	var ce rdap.ClientError
@@ -159,12 +207,12 @@ func IPAddrToAbuseC(ip netip.Addr) ([]string, error) {
 	client := &rdap.Client{UserAgent: "SkhronAbuseComplaintSender"}
 
 	for i := 0; i == 0 || (i < 10 && err != nil); i++ {
+		time.Sleep(time.Second * time.Duration(i*5))
+
 		ipMeta, err = client.QueryIP(ip.String())
 		if isClientError(rdap.ObjectDoesNotExist, err) {
 			return nil, queryerror.ErrBogonResource
 		}
-
-		time.Sleep(time.Second * time.Duration((i+1)*2))
 	}
 
 	var abuseContacts = make(map[string]bool, 0)
@@ -177,9 +225,11 @@ func IPAddrToAbuseC(ip netip.Addr) ([]string, error) {
 		metaProcessor(&abuseContacts, &ipMeta.Entities, &ipMeta.Links)
 
 		// try to extract email from remarks... -_-
+		/* FIXME: disabled due to triggering Spamhaus DBL
 		if len(abuseContacts) == 0 {
 			remarkProcessor(&abuseContacts, &ipMeta.Remarks, &ipMeta.Entities)
 		}
+		*/
 
 		if ipMeta.Country == "BR" { // they wish to receive copies of complaints
 			abuseContacts["cert@cert.br"] = true
@@ -198,12 +248,12 @@ func AsnToAbuseC(asn uint) ([]string, error) {
 	client := &rdap.Client{UserAgent: "SkhronAbuseComplaintSender"}
 
 	for i := 0; i == 0 || (i < 5 && err != nil); i++ {
+		time.Sleep(time.Second * time.Duration(i*5))
+
 		asnMeta, err = client.QueryAutnum(strconv.Itoa(int(asn)))
 		if isClientError(rdap.ObjectDoesNotExist, err) {
 			return nil, queryerror.ErrBogonResource
 		}
-
-		time.Sleep(time.Second * time.Duration(i*2))
 	}
 
 	var abuseContacts = make(map[string]bool, 0)
@@ -212,9 +262,11 @@ func AsnToAbuseC(asn uint) ([]string, error) {
 		metaProcessor(&abuseContacts, &asnMeta.Entities, &asnMeta.Links)
 
 		// try to extract email from remarks... -_-
+		/* FIXME: disabled due to triggering Spamhaus DBL
 		if len(abuseContacts) == 0 {
 			remarkProcessor(&abuseContacts, &asnMeta.Remarks, &asnMeta.Entities)
 		}
+		*/
 	} else {
 		l.Logger.Printf("[%d] RDAP query failed: %s\n", asn, err.Error())
 	}

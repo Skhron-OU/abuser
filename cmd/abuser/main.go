@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"net/netip"
 	"strconv"
 
 	l "abuser/internal/logger"
@@ -62,7 +61,7 @@ func webhookCrowdsec(_ http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		for _, item := range parsedBody {
-			ipAddr := netip.MustParseAddr(item.Source.IP)
+			ipAddr := utils.NormalizeIpAddr(item.Source.IP)
 
 			abuseContacts, bogonStatus = querygeneric.IPAddrToAbuseC(ipAddr)
 			if bogonStatus.IsBogonIP || len(bogonStatus.BogonsAS) > 0 {

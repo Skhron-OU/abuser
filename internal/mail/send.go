@@ -12,38 +12,7 @@ import (
 	l "abuser/internal/logger"
 )
 
-type SMTP struct {
-	Helo string
-	Host string
-	Port uint16
-	User string
-	Pass string
-}
-
-func (s *SMTP) GetAddr() string {
-	return fmt.Sprintf("%s:%d", s.Host, s.Port)
-}
-
-type Email struct {
-	EnvelopeFrom string
-	EnvelopeTo   []string
-	Headers      map[string]string
-	Body         string
-}
-
 const retryAttempts = 10
-
-var errsTemporary = []string{
-	"try later",
-	"try again later",
-	"temporarily deferred",
-	"temporarily unavailable",
-	"Greylist",
-	"Silverlist",
-	"Domain not found", // may be due to temporary DNS issue
-	"Service currently unavailable",
-	"Address verification in progress",
-}
 
 func (email *Email) Send(creds SMTP, attempt uint) {
 	tlsConnonfig := &tls.Config{
@@ -90,25 +59,21 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 
 	// acknowledge who are the recipients for SMTP server
 	recipientCount := len(email.EnvelopeTo)
-	var acceptedRecipients []string
+	var (
+		errStr             string
+		isFatal            bool
+		acceptedRecipients []string
+	)
+
 	for _, recipient := range email.EnvelopeTo {
 		err = smtpConn.Rcpt(recipient)
 
 		if err == nil {
 			acceptedRecipients = append(acceptedRecipients, recipient)
 		} else if attempt < retryAttempts {
-			errStr := err.Error()
+			isFatal, errStr = IsFatalSmtpError(err.Error())
 
-			// TODO: consider matching on SMTP error codes instead?
-			isTemporary := false
-			for _, temporaryErrStr := range errsTemporary {
-				isTemporary = isTemporary || strings.Contains(errStr, temporaryErrStr)
-				if isTemporary {
-					break
-				}
-			}
-
-			if isTemporary {
+			if !isFatal {
 				l.Logger.Printf("[%s] Retrying %s for %d time...\n", email.Headers["Subject"], recipient, attempt+1)
 				go func(email *Email, creds *SMTP, attempt uint, recipient string) {
 					durationStr := fmt.Sprintf("%fs", math.Pow(4, float64(attempt)))
@@ -124,7 +89,7 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 					}
 				}(email, &creds, attempt+1, recipient)
 			} else {
-				l.Logger.Printf("[%s] Invalid recipient <%s>: %s\n", email.Headers["Subject"], recipient, err.Error())
+				l.Logger.Printf("[%s] Invalid recipient <%s>: %s\n", email.Headers["Subject"], recipient, errStr)
 			}
 		}
 

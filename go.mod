@@ -2,7 +2,10 @@ module abuser
 
 go 1.18
 
-require github.com/openrdap/rdap v0.9.1
+require (
+	github.com/gammazero/deque v0.2.1
+	github.com/openrdap/rdap v0.9.1
+)
 
 require (
 	github.com/alecthomas/kingpin/v2 v2.4.0 // indirect

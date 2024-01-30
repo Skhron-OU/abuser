@@ -21,7 +21,10 @@ func IPAddrToAbuseC(ip netip.Addr) ([]string, BogonStatus) {
 	var bogonStatus = BogonStatus{BogonsAS: make([]uint, 0)}
 
 	emails, err := queryrdap.IPAddrToAbuseC(ip)
-	bogonStatus.IsBogonIP = errors.Is(err, queryerror.ErrBogonResource)
+
+	if errors.Is(err, queryerror.ErrBogonResource) {
+		bogonStatus.IsBogonIP = true
+	}
 
 	var asns []uint = queryripestat.IPAddrToAS(ip)
 	bogonStatus.HasValidAS = (len(asns) > 0)

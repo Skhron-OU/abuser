@@ -4,7 +4,7 @@ import (
 	"abuser/internal/utils"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/netip"
 	"net/url"
@@ -104,7 +104,7 @@ func prefixRoa(net netip.Prefix, asnsRaw []uint) map[uint]bool {
 	for i, asn := range asnsRaw {
 		asnsStr[i] = strconv.Itoa(int(asn))
 	}
-	asnsStr = append(asnsStr, "0") // ensure that we always receive at least two entries
+	asnsStr = append(asnsStr, "0", "65536") // ensure that we always receive at least two entries
 	param["resources"] = strings.Join(asnsStr, ",")
 
 	responseJSON, err := craftRequest("rpki-validation", param)
@@ -136,8 +136,10 @@ func routingConsistency(ip netip.Addr) (map[uint]RoutingConsistency, *netip.Pref
 	}
 
 	var responseAPI apiResponse[apiResponseData]
-	err = json.Unmarshal(responseJSON, &responseAPI)
-	utils.HandleCriticalError(err)
+	if err = json.Unmarshal(responseJSON, &responseAPI); err != nil {
+		l.Logger.Printf("[prefix-routing-constitency:%s] %s", ip.String(), err.Error())
+		return map[uint]RoutingConsistency{}, nil
+	}
 
 	asns := make(map[uint]RoutingConsistency, 0)
 	mostSpecificPrefix := netip.PrefixFrom(ip, 0)
@@ -222,32 +224,46 @@ func craftRequest(dataCall string, param map[string]string) ([]byte, error) {
 	}
 	apiURL.RawQuery = query.Encode()
 
-	var netClient = &http.Client{Timeout: time.Second * 60}
-	response, err := netClient.Get(apiURL.String())
-	if err != nil {
-		return nil, err
+	var (
+		netClient    = &http.Client{Timeout: time.Second * 60}
+		responseJSON = new([]byte)
+		responseAPI  apiResponse[json.RawMessage]
+	)
+
+	// retry on any encountered error
+	for i := 0; i < 5; i++ {
+		time.Sleep(time.Second * time.Duration(i*5))
+
+		response, err := netClient.Get(apiURL.String())
+		if err != nil {
+			return nil, err
+		}
+
+		if response.StatusCode != 200 {
+			l.Logger.Printf("[dataCall:%s, param:%+v] StatusCode: %d\n", dataCall, param, response.StatusCode)
+			continue
+		}
+
+		*responseJSON, err = io.ReadAll(response.Body)
+		response.Body.Close()
+		utils.HandleCriticalError(err)
+
+		err = json.Unmarshal(*responseJSON, &responseAPI)
+		utils.HandleCriticalError(err)
+
+		if responseAPI.Status == "ok" {
+			break
+		}
 	}
 
-	// if response.StatusCode != 200 {
-	// 	l.Logger.Printf("[dataCall:%s, param:%+v] HTTP status code: %d\n", dataCall, param, response.StatusCode)
-	// }
-
-	responseJSON, err := ioutil.ReadAll(response.Body)
-	response.Body.Close()
-	utils.HandleCriticalError(err)
-
-	var responseAPI apiResponse[json.RawMessage]
-	err = json.Unmarshal(responseJSON, &responseAPI)
-	utils.HandleCriticalError(err)
-
 	if responseAPI.Status != "ok" {
-		l.Logger.Printf("[dataCall:%s, param:%+v] Status: %s\n", dataCall, param, responseAPI.Status)
-		return nil, errors.New(responseAPI.Message)
+		l.Logger.Printf("[dataCall:%s, param:%+v] Status: %s, Message: %s\n", dataCall, param, responseAPI.Status, responseAPI.Message)
+		return nil, errors.New(responseAPI.Status)
 	}
 
 	if !strings.HasPrefix(responseAPI.DataCallStatus, "supported") {
 		l.Logger.Printf("[dataCall:%s, param:%+v] DataCallStatus: %s\n", dataCall, param, responseAPI.DataCallStatus)
 	}
 
-	return responseJSON, nil
+	return *responseJSON, nil
 }
