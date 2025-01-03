@@ -29,14 +29,6 @@ const (
 	contactTypeAbuseLoose  = "abuseContact"
 )
 
-/* FIXME: dead code
-var emailRegexp *regexp.Regexp
-
-func init() {
-	emailRegexp = regexp.MustCompile("(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\\])")
-}
-*/
-
 var nichdlForceValid map[string]bool
 var nichdlOptOut map[string]bool
 
@@ -169,10 +161,6 @@ func processEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactT
 			break
 		case emailTypeAny:
 		default:
-			/* fallback mode, gather all available emails */
-			/* FIXME: disabled due to triggering Spamhaus DBL
-			mailboxCollector(abuseContacts, entity.VCard.Properties, emailTypeAny)
-			*/
 		}
 	}
 
@@ -194,7 +182,7 @@ func processEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactT
 					continue
 				}
 
-				if _, ok := (*abuseContacts)[invalidEmail]; ok { // APNIC-specific
+				if _, ok := (*abuseContacts)[invalidEmail]; ok {
 					delete((*abuseContacts), invalidEmail)
 				}
 			}
@@ -226,24 +214,6 @@ func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
 		}
 	}
 }
-
-/* FIXME: fallback is unused now, this is a dead code
-func remarkProcessor(abuseContacts *map[string]bool, remarks *[]rdap.Remark, entities *[]rdap.Entity) {
-	var emails []string
-	for _, remark := range *remarks {
-		for _, description := range remark.Description {
-			emails = emailRegexp.FindAllString(description, -1)
-			for _, email := range emails {
-				(*abuseContacts)[email] = true
-			}
-		}
-	}
-
-	for i := range *entities {
-		remarkProcessor(abuseContacts, &(*entities)[i].Remarks, &(*entities)[i].Entities)
-	}
-}
-*/
 
 func isClientError(t rdap.ClientErrorType, err error) bool {
 	if ce, ok := err.(*rdap.ClientError); ok {
@@ -325,13 +295,6 @@ func AsnToAbuseC(asn uint) ([]string, error) {
 
 	if err == nil {
 		metaProcessor(&abuseContacts, &asnMeta.Entities)
-
-		// try to extract email from remarks... -_-
-		/* FIXME: disabled due to triggering Spamhaus DBL
-		if len(abuseContacts) == 0 {
-			remarkProcessor(&abuseContacts, &asnMeta.Remarks, &asnMeta.Entities)
-		}
-		*/
 
 		if len(abuseContacts) == 0 {
 			l.Logger.Printf("[%d] RDAP query failed: no abuse contacts found after %d tries\n", asn, retriesDone)
