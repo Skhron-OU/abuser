@@ -36,8 +36,10 @@ SA42597-RIPE
 
 # abuse[]rt.ru
 # abuse[]moscow.rt.ru
+# ripe[]rt.ru
 RTNC-RIPE
 NCN7-RIPE
+CTC1-RIPE
 
 # abuse[]kmtn.ru
 KA4497-RIPE
