@@ -1,0 +1,11 @@
+abuse_report[abuse_type]:intrusion
+abuse_report[intrusion_category]:scans
+abuse_report[intrusion_sub_category]:portscan
+abuse_report[email]:{{.FromEmail}}
+abuse_report[abuse_evidence]:{{urlpathescape .Evidence}}
+abuse_report[source_ip]:{{.IP}}
+abuse_report[date]:{{.Date}}
+abuse_report[time]:{{.Time}}
+abuse_report[timezone]:+00:00
+abuse_report[destination_port]:{{range .Events}}{{printf "%d/tcp%%0A" .DstPort}}{{end}}
+abuse_report[destination_ip_addresses]:{{range .Events}}{{printf "%s%%0A" .DstIP}}{{end}}

@@ -1,4 +1,4 @@
-This is an automated abuse complaint regarding active TCP service probing
+This is an automated abuse complaint regarding active TCP port scan
 (establishing multiple connections). All these connections are to dynamically
 located tarpit type honeypots and thus provide sufficiently reliable evidence
 to claim an ongoing port scan activity.
@@ -22,9 +22,15 @@ reply to this message - all replies are processed manually.
 
 Incident details are attached below:
 
-Timestamp                SrcIP            SrcPort DstIP            DstPort{{range .Events}}
-{{printf "%-24s" .Timestamp}} {{printf "%-16s" .SrcIP}} {{printf "%-5d" .SrcPort}}   {{printf "%-16s" .DstIP}} {{printf "%-5d" .DstPort}}{{end}}
--------------------------------------------------------------------------------
+{{/* calculate variables to render table in compact yet scalable format */ -}}
+{{$iplen := len .IP -}}
+{{range .Events}}{{with $dstlen := len .DstIP}}{{if gt $dstlen $iplen}}{{$iplen = $dstlen}}{{end}}{{end}}{{end -}}
+{{$ipfmt := printf "%%-%ds" $iplen -}}
+{{$hdrlen := sum 24 1 $iplen 1 7 1 $iplen 7 1 -}}
+
+{{printf "%-24s" "Timestamp"}} {{printf $ipfmt "SrcIP"}} SrcPort {{printf $ipfmt "DstIP"}} DstPort{{range .Events}}
+{{printf "%-24s" .Timestamp}} {{printf $ipfmt .SrcIP}} {{printf "%-7d" .SrcPort}} {{printf $ipfmt .DstIP}} {{printf "%-7d" .DstPort}}{{end}}
+{{repeat "-" $hdrlen}}
 
 This table contains established TCP connections (ones confirmed using 3WHS -
 three way handshake, which makes our data not vulnerable to an IP spoofing
@@ -33,6 +39,9 @@ use sampled network monitoring, for example, with sFlow.
 
 Please do not hesitate to reply to this letter if you have any questions or
 concerns regarding the current case.
+
+We also provide hourly feed of all detected malicious IP addresses here:
+https://otx.alienvault.com/pulse/66794486bda6c3cf8823c604
 
 Kind regards,
 Network department

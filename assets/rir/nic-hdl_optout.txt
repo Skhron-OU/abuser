@@ -1,0 +1,164 @@
+# This file stores list of nic-hdl that are opt-out from abuse complaints
+
+# They do not wish to hear anything about abuse complaints:
+# "Please note that CNNIC is not an ISP and is not empowered to
+# investigate complaints of network abuse. Please contact the tech-c
+# or admin-c of the network."
+IRT-CNNIC-CN
+
+# "Please remove our email address from automated notifications that do not
+# involve an actual attack. We cannot meaningfully process complaints about an
+# IP simply looking at a port."
+LIGHT7-ARIN
+
+# remarks:        Please prefer http://abuse.online.net to report abuses
+# nic-hdl:        AR32851-RIPE
+# org:            ORG-ONLI1-RIPE
+# abuse-mailbox:  abuse[]online.net
+#
+# organisation:   ORG-ONLI1-RIPE
+# org-name:       Scaleway
+# abuse-c:        AR32851-RIPE
+# mnt-by:         ONLINE-NET-MNT
+# ---
+# The form mentioned at the remarks is not possible to automate without
+# solving CAPTCHA, decided to not deactivate for now
+#AR32851-RIPE
+
+# "Your logs dont show any proof of a 3 way handshake being doine and look
+# exaclt like any other tcp syn scan report we get, while it might be that this
+# IP is indeed scanning (it cannot be fully proven even with thousands of
+# reports, we do not have access to it), we cannot exactly "check it", traffic
+# being sent is not a netscan."
+#
+# abuse[]snowcore.io
+SA42597-RIPE
+
+# abuse[]rt.ru
+# abuse[]moscow.rt.ru
+RTNC-RIPE
+NCN7-RIPE
+
+# abuse[]kmtn.ru
+KA4497-RIPE
+
+# a.zorin[]ttk.ru
+# ripe[]sibir.ttk.ru
+# baykal_iptech[]baikal.ttk.ru
+# cous[]ural.ttk.ru
+AR63191-RIPE
+AR16923-RIPE
+BTTC-RIPE
+HDHD-RIPE
+
+# hostmaster[]vgccl.net
+AC30115-RIPE
+
+# 1332109375[]qq.com
+IRT-CHINANET-SC
+
+# abuse[]planttel.net
+NETWO8445-ARIN
+
+# pvm[]brest.beltelecom.by
+BYBF-RIPE
+
+# abuse[]fregat.net
+AR74412-RIPE
+
+# gunlapode[]corecasys.com
+IRT-NNCK-TH
+
+# liujie[]wishisp.com
+IRT-WISHNET-CN
+
+# maksim[]ats99.ru
+AR48394-RIPE
+
+# admin[]zhuliuyun.com
+IRT-HMCNTL-HK
+
+# abuse[]vmedia.ca
+TCHER-ARIN
+
+# info[]smart.az
+AR14133-RIPE
+
+# abuse[]nsplus.ru
+AR21942-RIPE
+
+# noc[]solnet.net.id
+IRT-SOLNET-ID
+
+# noc[]citylink.com.kh
+AC1592-AP
+
+# aziz[]bdl.nusa.net.id
+IRT-LAMPUNGHOSTING-ID
+
+# abusec[]achim.ru
+AR13523-RIPE
+
+# abuse[]iiat.ru
+IIAT1-RIPE
+
+# Used as a stab: "There is no known POC for this organization. This is a
+# placeholder record. Please contact hostmaster[]arin.net if you can provide
+# contact information for this record."
+CKN23-ARIN
+
+# "As a CDN service provider, it is necessary for us to provide the fastest
+# path over the Internet, which requires us to scan various endpoints to
+# determine shortest paths. This results in benign ping checks to the known IP
+# space. It is neither an attack nor a prohibited action, so you can ignore
+# these packets."
+IAA24-ARIN
+
+# noc-abuse[]mschosting.com
+IRT-EXABYTES-MY
+AE273-AP
+
+# Emerald Onion operates high capacity, unfiltered Tor exit relays
+ABUSE7315-ARIN
+
+# rrmontealverne[]yahoo.com.br: opt-out from abuse complaints
+ROKME3
+
+# ryrrams[]gmail.com: opt-out from abuse complaints
+IRT-GIGAFIBERCORP-PH
+
+# networkabuse[]domaintools.com
+NETWO4008-ARIN
+
+# "Шлюзы. Подтверждение E-mail": "Вы не зарегистрированы в нашей системе. Для
+# того, чтобы сообщение было принято, вам нужно перейти по ссылке и подтвердить
+# регистрацию."
+ACRO45793-RIPE
+
+# "550 5.4.1 Recipient address rejected: Access denied."
+AT939-AP
+IRT-TWNIC-AP
+
+# China
+XI5-AP
+AC1573-AP
+IRT-CHINANET-CN
+IRT-CU-CN
+IRT-CHINAMOBILE-CN
+IRT-CHINANET-SX
+IRT-UCLOUD-NET-CN
+
+# Has tempmail for an abuse-contact
+EGC17
+
+# hostmaster@
+ARIN-HOSTMASTER
+IRT-KRNIC-KR
+IRT-JPNIC-JP
+SPH-RIPE
+
+# abuse[]youbroadband.co.in
+IRT-IN-YOU
+
+# reports[]magnates.co.za
+ACRO57369-RIPE

@@ -1,4 +1,4 @@
-package webreport
+package reporter
 
 import (
 	"abuser/internal/utils"

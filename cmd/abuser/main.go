@@ -3,6 +3,7 @@ package main
 import (
 	"abuser/internal/querygeneric"
 	"abuser/internal/reporter"
+	"abuser/internal/structs"
 	"abuser/internal/utils"
 	"encoding/json"
 	"io/ioutil"
@@ -11,19 +12,6 @@ import (
 
 	l "abuser/internal/logger"
 )
-
-type _PortscanEvent struct {
-	SrcIP     string // compatibility with Body template
-	SrcPort   uint16
-	DstIP     string
-	DstPort   uint16
-	Timestamp string
-}
-
-type tmplvarPortscan struct {
-	IP     string // compatibility with Subject template
-	Events []_PortscanEvent
-}
 
 type crowdsecEvent struct {
 	Meta      []crowdsecEventMeta `json:"meta"`
@@ -56,8 +44,8 @@ func webhookCrowdsec(_ http.ResponseWriter, r *http.Request) {
 	var abuseContacts []string
 	var bogonStatus querygeneric.BogonStatus
 
-	var tmplvar tmplvarPortscan
-	var _Event _PortscanEvent
+	var tmplData structs.TemplateData[structs.PortscanEvent]
+	var tmpEvent structs.PortscanEvent
 
 	go func() {
 		for _, item := range parsedBody {
@@ -70,33 +58,34 @@ func webhookCrowdsec(_ http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// template paremeters
-			tmplvar = tmplvarPortscan{IP: item.Source.IP, Events: nil}
+			tmplData = structs.TemplateData[structs.PortscanEvent]{IP: item.Source.IP, Events: nil}
 
 			for _, event := range item.Events {
-				_Event.Timestamp = event.Timestamp
 				for _, meta := range event.Meta {
 					switch meta.Key {
+					case "timestamp":
+						tmpEvent.Timestamp = event.Timestamp
+						break
 					case "source_port":
 						srcPort, _ := strconv.ParseUint(meta.Value, 10, 16)
-						_Event.SrcPort = uint16(srcPort)
+						tmpEvent.SrcPort = uint16(srcPort)
 						break
 					case "source_ip":
-						_Event.SrcIP = meta.Value
+						tmpEvent.SrcIP = meta.Value
 						break
 					case "destination_port":
 						dstPort, _ := strconv.ParseUint(meta.Value, 10, 16)
-						_Event.DstPort = uint16(dstPort)
+						tmpEvent.DstPort = uint16(dstPort)
 						break
 					case "destination_ip":
-						_Event.DstIP = meta.Value
+						tmpEvent.DstIP = meta.Value
 						break
 					}
 				}
-				tmplvar.Events = append(tmplvar.Events, _Event)
+				tmplData.Events = append(tmplData.Events, tmpEvent)
 			}
 
-			reporter.Report(abuseContacts, ipAddr, tmplvar, "portscan")
+			reporter.Report(abuseContacts, ipAddr, tmplData, "portscan")
 		}
 	}()
 }

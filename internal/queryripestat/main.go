@@ -69,31 +69,34 @@ type RoutingConsistency struct {
 
 func IPAddrToAS(ip netip.Addr) []uint {
 	asnsBgp, mostSpecificPrefix := routingConsistency(ip)
-
 	if mostSpecificPrefix == nil {
-		l.Logger.Printf("[%s] mostSpecificPrefix is nil, should not happen!\n", ip.String())
 		return utils.Keys(asnsBgp)
 	}
 
 	asnsRoa := prefixRoa(*mostSpecificPrefix, utils.Keys(asnsBgp))
 
-	var asns []uint
+	asnsToFilter := utils.GetUnique(append(utils.Keys(asnsBgp), utils.Keys(asnsRoa)...))
 
-	if len(asnsRoa) == 0 {
-		for asn, info := range asnsBgp {
-			if info.InBGP && info.InIRR {
+	if len(asnsToFilter) == 1 {
+		return asnsToFilter
+	} else {
+		var asns []uint
+
+		for _, asn := range asnsToFilter {
+			legacyInfo, isLegacy := asnsBgp[asn]
+			_, isRpkiValid := asnsRoa[asn]
+
+			if !isLegacy {
+				continue
+			}
+
+			if legacyInfo.InBGP && (legacyInfo.InIRR || isRpkiValid) {
 				asns = append(asns, asn)
 			}
 		}
-	}
 
-	for asn := range asnsBgp {
-		if _, ok := asnsRoa[asn]; ok {
-			asns = append(asns, asn)
-		}
+		return asns
 	}
-
-	return asns
 }
 
 func prefixRoa(net netip.Prefix, asnsRaw []uint) map[uint]bool {
@@ -132,6 +135,7 @@ func routingConsistency(ip netip.Addr) (map[uint]RoutingConsistency, *netip.Pref
 
 	responseJSON, err := craftRequest("prefix-routing-consistency", param)
 	if err != nil {
+		l.Logger.Printf("[prefix-routing-constitency:%s] %s", ip.String(), err.Error())
 		return map[uint]RoutingConsistency{}, nil
 	}
 
@@ -145,17 +149,12 @@ func routingConsistency(ip netip.Addr) (map[uint]RoutingConsistency, *netip.Pref
 	mostSpecificPrefix := netip.PrefixFrom(ip, 0)
 
 	for _, routeObject := range responseAPI.Data.Routes {
-		_, ok := asns[routeObject.Origin]
-		if ok && (!routeObject.InBGP || !routeObject.InIRR) {
-			continue
-		}
-
-		asns[routeObject.Origin] = RoutingConsistency{routeObject.InBGP, routeObject.InIRR}
-
 		thisPrefix, _ := netip.ParsePrefix(routeObject.Prefix)
 		if mostSpecificPrefix.Bits() < thisPrefix.Bits() {
 			mostSpecificPrefix = thisPrefix
 		}
+
+		asns[routeObject.Origin] = RoutingConsistency{routeObject.InBGP, routeObject.InIRR}
 	}
 
 	return asns, &mostSpecificPrefix
@@ -236,7 +235,7 @@ func craftRequest(dataCall string, param map[string]string) ([]byte, error) {
 
 		response, err := netClient.Get(apiURL.String())
 		if err != nil {
-			return nil, err
+			continue
 		}
 
 		if response.StatusCode != 200 {

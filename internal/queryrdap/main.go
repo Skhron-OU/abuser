@@ -3,13 +3,16 @@ package queryrdap
 import (
 	"abuser/internal/queryerror"
 	"abuser/internal/utils"
-	"errors"
+	"bytes"
 	"fmt"
+	"io"
 	"net/netip"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	l "abuser/internal/logger"
 
@@ -34,6 +37,40 @@ func init() {
 }
 */
 
+var nichdlForceValid map[string]bool
+var nichdlOptOut map[string]bool
+
+func nichdl(nichdlMap *map[string]bool, nichdlPath string) {
+	f, err := os.Open(nichdlPath)
+
+	if err != nil {
+		l.Logger.Printf("%s\n", err.Error())
+		return
+	}
+
+	defer f.Close()
+
+	b, err := io.ReadAll(f)
+
+	for _, entry := range bytes.Split(b, []byte("\n")) {
+		entry = bytes.TrimSpace(entry)
+
+		if len(entry) == 0 || bytes.HasPrefix(entry, []byte("#")) {
+			continue
+		}
+
+		(*nichdlMap)[*(*string)(unsafe.Pointer(&entry))] = true
+	}
+}
+
+func init() {
+	nichdlForceValid = make(map[string]bool, 0)
+	nichdl(&nichdlForceValid, "assets/rir/nic-hdl_force_valid.txt")
+
+	nichdlOptOut = make(map[string]bool, 0)
+	nichdl(&nichdlOptOut, "assets/rir/nic-hdl_optout.txt")
+}
+
 func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardProperty, emailType string) {
 	var (
 		processedEmail string
@@ -55,42 +92,45 @@ func mailboxCollector(abuseContacts *map[string]bool, props []*rdap.VCardPropert
 	}
 }
 
-func processEntity(abuseContacts *map[string]bool, entity *rdap.Entity, links *[]rdap.Link, contactType string) {
+func processEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactType string) {
 	// resolve only bare minimum of contacts
 	if len(*abuseContacts) > 0 {
 		return
 	}
 
-	// They do not wish to hear anything about abuse complaints:
-	// "Please note that CNNIC is not an ISP and is not empowered to
-	// investigate complaints of network abuse. Please contact the tech-c
-	// or admin-c of the network."
-	if entity.Handle == "IRT-CNNIC-CN" {
+	// opt out specific contacts
+	if _, ok := nichdlOptOut[entity.Handle]; ok {
 		return
 	}
 
-	var err error
 	client := &rdap.Client{}
 
 	// do additional query for this entity if RIR didn't include contact details for some reason
-	if entity.VCard == nil && len(*links) > 0 && entity.Handle != "" {
-		entityRequest := rdap.NewEntityRequest(entity.Handle)
-		for _, link := range *links {
+	if entity.VCard == nil && entity.Handle != "" {
+	EntityLinksLoop:
+		for _, link := range entity.Links {
 			if link.Rel == "self" {
-				entityRequest.Server, err = url.Parse(link.Href)
-				entityRequest.Server.Path = ""
+				entityUrl, err := url.Parse(link.Href)
 				if err != nil {
 					break
 				}
 
-				var entityResponse *rdap.Response
-				for i := 0; i == 0 || (i < 5 && err != nil); i++ {
-					time.Sleep(time.Second * time.Duration(i*5))
+				entityRequest := rdap.NewRawRequest(entityUrl)
+
+				entityResponse, retriesDone := (*rdap.Response)(nil), 0
+				for ; retriesDone == 0 || (retriesDone < 10 && err != nil); retriesDone++ {
+					time.Sleep(time.Second * time.Duration(retriesDone*5))
 
 					entityResponse, err = client.Do(entityRequest)
-					if isClientError(rdap.ObjectDoesNotExist, err) {
-						break
+					if err != nil && isClientError(rdap.ObjectDoesNotExist, err) {
+						l.Logger.Printf("%s", entityResponse.Object.(*rdap.Entity).DecodeData.String())
+						break EntityLinksLoop
 					}
+				}
+
+				if err != nil || entityResponse == nil {
+					l.Logger.Printf("[%s] RDAP query failed: no entity data found after %d tries because %s", entity.Handle, retriesDone, err.Error())
+					break
 				}
 
 				entity.VCard = entityResponse.Object.(*rdap.Entity).VCard
@@ -100,9 +140,11 @@ func processEntity(abuseContacts *map[string]bool, entity *rdap.Entity, links *[
 	}
 
 	// skip invalid contacts
-	for _, remark := range entity.Remarks {
-		if remark.Title == "Unvalidated POC" { // ARIN-specific
-			return
+	if _, ok := nichdlForceValid[entity.Handle]; !ok {
+		for _, remark := range entity.Remarks {
+			if remark.Title == "Unvalidated POC" { // ARIN-specific
+				return
+			}
 		}
 	}
 
@@ -134,19 +176,33 @@ func processEntity(abuseContacts *map[string]bool, entity *rdap.Entity, links *[
 		}
 	}
 
+	for _, field := range entity.DecodeData.Fields() {
+		notes := entity.DecodeData.Notes(field)
+		if len(notes) > 0 {
+			l.Logger.Printf("[%s] Minor RDAP query warnings/errors: %+v", entity.Handle, notes)
+		}
+	}
+
 	// remove invalid contacts
-	for _, remark := range entity.Remarks {
-		for _, description := range remark.Description {
-			// APNIC-specific
-			invalidEmail := strings.Replace(description, " is invalid", "", 1)
-			if _, ok := (*abuseContacts)[invalidEmail]; ok { // APNIC-specific
-				delete((*abuseContacts), invalidEmail)
+	if _, ok := nichdlForceValid[entity.Handle]; !ok {
+		for _, remark := range entity.Remarks {
+			for _, description := range remark.Description {
+				// APNIC-specific
+				invalidEmail := strings.Replace(description, " is invalid", "", 1)
+
+				if invalidEmail == description {
+					continue
+				}
+
+				if _, ok := (*abuseContacts)[invalidEmail]; ok { // APNIC-specific
+					delete((*abuseContacts), invalidEmail)
+				}
 			}
 		}
 	}
 }
 
-func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity, links *[]rdap.Link) {
+func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
 	var (
 		q      deque.Deque[*rdap.Entity]
 		entity *rdap.Entity
@@ -160,7 +216,7 @@ func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity, link
 
 			for q.Len() != 0 {
 				entity = q.PopFront()
-				processEntity(abuseContacts, entity, links, contactType)
+				processEntity(abuseContacts, entity, contactType)
 				for i := range entity.Entities {
 					q.PushBack(&(*&entity.Entities)[i])
 				}
@@ -190,8 +246,7 @@ func remarkProcessor(abuseContacts *map[string]bool, remarks *[]rdap.Remark, ent
 */
 
 func isClientError(t rdap.ClientErrorType, err error) bool {
-	var ce rdap.ClientError
-	if errors.As(err, &ce) {
+	if ce, ok := err.(*rdap.ClientError); ok {
 		if ce.Type == t {
 			return true
 		}
@@ -206,11 +261,12 @@ func IPAddrToAbuseC(ip netip.Addr) ([]string, error) {
 
 	client := &rdap.Client{UserAgent: "SkhronAbuseComplaintSender"}
 
-	for i := 0; i == 0 || (i < 10 && err != nil); i++ {
-		time.Sleep(time.Second * time.Duration(i*5))
+	retriesDone := 0
+	for ; retriesDone == 0 || (retriesDone < 10 && err != nil); retriesDone++ {
+		time.Sleep(time.Second * time.Duration(retriesDone*5))
 
 		ipMeta, err = client.QueryIP(ip.String())
-		if isClientError(rdap.ObjectDoesNotExist, err) {
+		if err != nil && isClientError(rdap.ObjectDoesNotExist, err) {
 			return nil, queryerror.ErrBogonResource
 		}
 	}
@@ -222,17 +278,25 @@ func IPAddrToAbuseC(ip netip.Addr) ([]string, error) {
 			return nil, queryerror.ErrBogonResource
 		}
 
-		metaProcessor(&abuseContacts, &ipMeta.Entities, &ipMeta.Links)
+		metaProcessor(&abuseContacts, &ipMeta.Entities)
 
-		// try to extract email from remarks... -_-
-		/* FIXME: disabled due to triggering Spamhaus DBL
 		if len(abuseContacts) == 0 {
-			remarkProcessor(&abuseContacts, &ipMeta.Remarks, &ipMeta.Entities)
-		}
-		*/
+			l.Logger.Printf("[%s] RDAP query failed: no abuse contacts found after %d tries\n", ip.String(), retriesDone)
 
-		if ipMeta.Country == "BR" { // they wish to receive copies of complaints
-			abuseContacts["cert@cert.br"] = true
+			// FIXME: implement recursive parent lookup
+			parentHandle := utils.NormalizeIpRange(ipMeta.ParentHandle)
+			if parentHandle != "" {
+				upperIpMeta, err := client.QueryIP(parentHandle)
+				if err == nil {
+					metaProcessor(&abuseContacts, &upperIpMeta.Entities)
+				} else {
+					l.Logger.Printf("[%s] parent network [%s] RDAP query failed: %s\n", ip.String(), parentHandle, err.Error())
+				}
+			}
+		} else {
+			if ipMeta.Country == "BR" { // they wish to receive copies of complaints
+				abuseContacts["cert@cert.br"] = true
+			}
 		}
 	} else {
 		l.Logger.Printf("[%s] RDAP query failed: %s\n", ip.String(), err.Error())
@@ -247,11 +311,12 @@ func AsnToAbuseC(asn uint) ([]string, error) {
 
 	client := &rdap.Client{UserAgent: "SkhronAbuseComplaintSender"}
 
-	for i := 0; i == 0 || (i < 5 && err != nil); i++ {
-		time.Sleep(time.Second * time.Duration(i*5))
+	retriesDone := 0
+	for ; retriesDone == 0 || (retriesDone < 10 && err != nil); retriesDone++ {
+		time.Sleep(time.Second * time.Duration(retriesDone*5))
 
 		asnMeta, err = client.QueryAutnum(strconv.Itoa(int(asn)))
-		if isClientError(rdap.ObjectDoesNotExist, err) {
+		if err != nil && isClientError(rdap.ObjectDoesNotExist, err) {
 			return nil, queryerror.ErrBogonResource
 		}
 	}
@@ -259,7 +324,7 @@ func AsnToAbuseC(asn uint) ([]string, error) {
 	var abuseContacts = make(map[string]bool, 0)
 
 	if err == nil {
-		metaProcessor(&abuseContacts, &asnMeta.Entities, &asnMeta.Links)
+		metaProcessor(&abuseContacts, &asnMeta.Entities)
 
 		// try to extract email from remarks... -_-
 		/* FIXME: disabled due to triggering Spamhaus DBL
@@ -267,6 +332,10 @@ func AsnToAbuseC(asn uint) ([]string, error) {
 			remarkProcessor(&abuseContacts, &asnMeta.Remarks, &asnMeta.Entities)
 		}
 		*/
+
+		if len(abuseContacts) == 0 {
+			l.Logger.Printf("[%d] RDAP query failed: no abuse contacts found after %d tries\n", asn, retriesDone)
+		}
 	} else {
 		l.Logger.Printf("[%d] RDAP query failed: %s\n", asn, err.Error())
 	}

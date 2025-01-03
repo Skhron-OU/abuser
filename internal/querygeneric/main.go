@@ -29,7 +29,7 @@ func IPAddrToAbuseC(ip netip.Addr) ([]string, BogonStatus) {
 	var asns []uint = queryripestat.IPAddrToAS(ip)
 	bogonStatus.HasValidAS = (len(asns) > 0)
 
-	// fallback
+	/* FIXME: fallback gets incorrect abuse-mailbox sometimes
 	if len(emails) == 0 {
 		for _, asn := range asns {
 			asnEmails, err := queryrdap.AsnToAbuseC(asn)
@@ -40,6 +40,7 @@ func IPAddrToAbuseC(ip netip.Addr) ([]string, BogonStatus) {
 			}
 		}
 	}
+	*/
 
 	// remove duplicates
 	return utils.GetUnique(emails), bogonStatus

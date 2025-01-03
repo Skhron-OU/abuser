@@ -1,6 +1,11 @@
 package utils
 
-import "net/netip"
+import (
+	"encoding/hex"
+	"math"
+	"net/netip"
+	"strings"
+)
 
 func NormalizeIpAddr(ip string) netip.Addr {
 	rawAddr := netip.MustParseAddr(ip)
@@ -19,4 +24,61 @@ func NormalizeIpAddr(ip string) netip.Addr {
 	}
 
 	return rawAddr
+}
+
+// Convert IP range to a format of ipaddress/mask
+// On error, empty string is returned
+func NormalizeIpRange(ipr string) string {
+	var err error
+	var rString []string
+	var rStartA, rEndA netip.Addr
+	var rStartB, rEndB []byte
+	var rPrefix netip.Prefix
+	var mask int = 0
+	var maskDiff float64
+	if strings.Contains(ipr, " - ") {
+		rString = strings.Split(ipr, " - ")
+
+		rStartA, err = netip.ParseAddr(rString[0])
+		if err != nil {
+			return ""
+		}
+
+		rEndA, err = netip.ParseAddr(rString[1])
+		if err != nil || rStartA.BitLen() != rEndA.BitLen() {
+			return ""
+		}
+
+		rStartB = rStartA.AsSlice()
+		rEndB = rEndA.AsSlice()
+		var index, diff int
+		for b := rStartA.BitLen(); b > 0; b -= 8 {
+			index = (b / 8) - 1
+			diff = int(rEndB[index]) - int(rStartB[index])
+			if diff >= 0 {
+				maskDiff = math.Log2(float64(diff + 1))
+				if maskDiff != math.Trunc(maskDiff) {
+					return ""
+				} else {
+					mask += int(maskDiff)
+				}
+			} else {
+				return ""
+			}
+		}
+
+		mask = rStartA.BitLen() - mask
+		rPrefix, err = rStartA.Prefix(mask)
+		if err != nil {
+			return ""
+		} else {
+			return rPrefix.String()
+		}
+	}
+
+	return ""
+}
+
+func HexIpAddr(ip netip.Addr) string {
+	return hex.EncodeToString(ip.AsSlice())
 }

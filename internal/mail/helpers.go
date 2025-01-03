@@ -33,14 +33,14 @@ func IsFatalSmtpError(smtpErr string) (bool, string) {
 	replyCode, _ := smtpResult["replyCode"]
 
 	// RFC3463, status code (2.1.23, 4.1.1 etc.)
-	rawStatusCode, statusCodeOk := smtpResult["rawStatusCode"]
+	rawStatusCode, _ := smtpResult["rawStatusCode"]
 
 	// human readable part, sometimes is nested SMTP error (i.e. postfix
 	// address verification)
 	reason, _ := smtpResult["reason"]
 
 	// nothing more to analyze
-	if !statusCodeOk {
+	if len(rawStatusCode) == 0 {
 		switch strings.Split(replyCode, "")[0] {
 		case "4":
 			isFatal = false

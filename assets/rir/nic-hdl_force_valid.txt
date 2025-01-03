@@ -1,0 +1,11 @@
+# This file stores list of nic-hdl that are opt-out from RIR validity
+# verification (ARIN and APNIC have such)
+
+# DigitalOcean
+ABUSE5232-ARIN
+
+# Google Cloud
+GCABU-ARIN
+
+# Cloudflare
+ABUSE2916-ARIN
