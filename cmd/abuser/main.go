@@ -52,7 +52,7 @@ func webhookCrowdsec(_ http.ResponseWriter, r *http.Request) {
 			ipAddr := utils.NormalizeIpAddr(item.Source.IP)
 
 			abuseContacts, bogonStatus = querygeneric.IPAddrToAbuseC(ipAddr)
-			if bogonStatus.IsBogonIP || len(bogonStatus.BogonsAS) > 0 {
+			if bogonStatus.IsBogonIP {
 				// TODO: handle bogons and report them accordingly
 				l.Logger.Printf("[%s] Bogon resource! Bogon reports are currently not implemented, skipping.\n", item.Source.IP)
 				return
