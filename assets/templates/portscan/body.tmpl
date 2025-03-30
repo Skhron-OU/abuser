@@ -1,33 +1,33 @@
-This is an automated abuse complaint regarding suspected infected device within
-your network behind IP address {{.IP}}
+This is an automated abuse complaint regarding suspection of device infection
+within your network behind IP address {{.IP}}
 ---
 
-Our isolated systems received unsolicited incoming connection from an IP
-address under your control (abuse-mailbox as per RIR database). All unsolicited
-connections reported below have completed three-way handshake procedure defined
-per Transmission Control Protocol (TCP). This ensures our evidence was not
-tampered upon any external party posessing a source IP address spoofing
-capability, because three-way handshake procedure requires both receiving
-(device within our network) and sending (device within your network) parties to
-receive reply of another party to complete handshake.
+Our isolated systems has received multiple unsolicited incoming connections
+from an IP address under your control (abuse-mailbox as per RIR database). All
+unsolicited connections reported below have completed three-way handshake
+procedure defined per Transmission Control Protocol (TCP). This ensures that
+our evidence was not tampered upon any external party posessing a source IP
+address spoofing capability, because three-way handshake procedure requires
+both receiving (device within our network) and sending (device within your
+network) parties to receive reply of another party to complete handshake.
 
 The aforementioned isolated systems within our network are hosted at unused IP
-address space and implemented as a TCP listener, so that we can be sure our
-evidence is actually covers "unsolicited" and "not spoofed" activity.
+address space and are implemented as a TCP listener, so that we can be sure our
+evidence actually covering "unsolicited" and "not spoofed" activity.
 
-The activity we are reporting often referred to as "service probing" or "banner
-grabbing". Unlike typical "port scan" type of abuse complaints you might
-receive, our complaints are not induced by a single or multiple TCP packets
-with SYN flag set. Instead, as was mentioned previously, three-way handshake
-procedure is required. To eliminate possible false-positive alerts caused by
-human typo, abuse complaint is generated only upon having four (4) distinct
-successful connections as per (Source IP; Destination IP; Destination Port)
-tuple.
+The activity we are reporting is often referred to as "service probing" or
+"banner grabbing". Unlike typical "port scan" type of abuse complaints you
+might receive, our complaints are not induced by a single or multiple TCP
+packets with SYN flag set. Instead, as was mentioned previously, three-way
+handshake procedure is required. To eliminate possible false-positive alerts
+caused by human typo, abuse complaint is generated only upon having four (4)
+distinct successful connections as per (Source IP; Destination IP; Destination
+Port) tuple.
 
 To minimize "Internet background noise" our network observes, the reported IP
 address was temporarily banned. Do not worry, it will be unblocked
-automatically soon. If it is first report for this IP address within 90 days,
-block lasts 24 hours. Each following report within this timeframe extends
+automatically soon. If it is the first report for this IP address within 90
+days, block lasts 24 hours. Each following report within this timeframe extends
 blocking duration for 24 hours.
 
 As for implications for your network, we suspect that device within your
@@ -43,10 +43,10 @@ reasons, namely:
 - device is used by a legitimate Internet security researchers team that can be
   clearly attributed using Forward-confirmed reverse DNS (FCrDNS).
 
-Given exact reason in this situation, you would like to communicate with your
-client to address this issue as per Terms of Service of your organization or
-notify us of legitimate nature of this activity. When it comes to legitimate
-security researchers we are always co-operating to whitelist your networks as
+Given exact reason in this situation, you would like either to communicate with
+your client to address this issue as per Terms of Service of your organization
+or notify us of legitimate nature of this activity. When it comes to legitimate
+security researchers, we are always co-operating to whitelist your networks as
 long as FCrDNS is valid.
 
 Please note that we are providing hosting services, hence you are strongly
