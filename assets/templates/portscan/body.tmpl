@@ -1,26 +1,65 @@
-This is an automated abuse complaint regarding active TCP port scan
-(establishing multiple connections). All these connections are to dynamically
-located tarpit type honeypots and thus provide sufficiently reliable evidence
-to claim an ongoing port scan activity.
+This is an automated abuse complaint regarding suspected infected device within
+your network behind IP address {{.IP}}
+---
 
-This means the host behind IP address {{.IP}} is either:
+Our isolated systems received unsolicited incoming connection from an IP
+address under your control (abuse-mailbox as per RIR database). All unsolicited
+connections reported below have completed three-way handshake procedure defined
+per Transmission Control Protocol (TCP). This ensures our evidence was not
+tampered upon any external party posessing a source IP address spoofing
+capability, because three-way handshake procedure requires both receiving
+(device within our network) and sending (device within your network) parties to
+receive reply of another party to complete handshake.
 
-- serves a public proxy/VPN;
-- participates in a botnet operation or another kind of malware;
-- a VPS used by an illicit actor to find vulnerable publicly exposed services
-  (Telnet at 23/tcp, Samba at 445/tcp, FTP at 21/tcp, SSH at 22/tcp and so on).
+The aforementioned isolated systems within our network are hosted at unused IP
+address space and implemented as a TCP listener, so that we can be sure our
+evidence is actually covers "unsolicited" and "not spoofed" activity.
 
-We insist that you and/or your end-user will take all necessary actions to
-resolve the current issue. If you are an established VPN provider with zero-log
-policy, please let us know about that, so we will be able to whitelist you.
+The activity we are reporting often referred to as "service probing" or "banner
+grabbing". Unlike typical "port scan" type of abuse complaints you might
+receive, our complaints are not induced by a single or multiple TCP packets
+with SYN flag set. Instead, as was mentioned previously, three-way handshake
+procedure is required. To eliminate possible false-positive alerts caused by
+human typo, abuse complaint is generated only upon having four (4) distinct
+successful connections as per (Source IP; Destination IP; Destination Port)
+tuple.
 
-**We are a hosting provider Skhron, please DO NOT block any of our single IP
-address or entire blocks!**
+To minimize "Internet background noise" our network observes, the reported IP
+address was temporarily banned. Do not worry, it will be unblocked
+automatically soon. If it is first report for this IP address within 90 days,
+block lasts 24 hours. Each following report within this timeframe extends
+blocking duration for 24 hours.
 
-Wish to stop receiving such messages (are you a security researcher)? Please
-reply to this message - all replies are processed manually.
+As for implications for your network, we suspect that device within your
+network is infected with a malware. However, sometimes there are another
+reasons, namely:
 
-Incident details are attached below:
+- device hosts publicly accessible proxy or VPN (either intentionally, due to
+  software misconfiguration or due to usage of "proxyware" type of software);
+- device is infected with a malware (for example, networking worm, most frequently
+  this happens with IoT and DVR/IP cameras);
+- device (for example, server) is used by an malicious actor for exploitation
+  purposes (see "unethical hacking");
+- device is used by a legitimate Internet security researchers team that can be
+  clearly attributed using Forward-confirmed reverse DNS (FCrDNS).
+
+Given exact reason in this situation, you would like to communicate with your
+client to address this issue as per Terms of Service of your organization or
+notify us of legitimate nature of this activity. When it comes to legitimate
+security researchers we are always co-operating to whitelist your networks as
+long as FCrDNS is valid.
+
+Please note that we are providing hosting services, hence you are strongly
+discouraged from blocking any of the destination IP addresses mentioned below.
+
+If these complaints are considered irrelevant by your team for any reason, do
+not hesitate to let us know by replying to this letter. We will exclude your
+abuse-mailbox from receiving these abuse complaints in the future.
+
+Incident details are attached below. Please note that due to some automated
+abuse complaint processing systems parsing destination IP addresses as ones
+involved to this report, we are redacting destination IP addresses replacing
+all "." and ":" characters with "x".
 
 {{/* calculate variables to render table in compact yet scalable format */ -}}
 {{$iplen := len .IP -}}
@@ -28,21 +67,24 @@ Incident details are attached below:
 {{$ipfmt := printf "%%-%ds" $iplen -}}
 {{$hdrlen := sum 24 1 $iplen 1 7 1 $iplen 7 1 -}}
 
+```
 {{printf "%-24s" "Timestamp"}} {{printf $ipfmt "SrcIP"}} SrcPort {{printf $ipfmt "DstIP"}} DstPort{{range .Events}}
 {{printf "%-24s" .Timestamp}} {{printf $ipfmt .SrcIP}} {{printf "%-7d" .SrcPort}} {{printf $ipfmt .DstIP}} {{printf "%-7d" .DstPort}}{{end}}
 {{repeat "-" $hdrlen}}
+```
 
-This table contains established TCP connections (ones confirmed using 3WHS -
-three way handshake, which makes our data not vulnerable to an IP spoofing
-attack). These events cannot be forged and can be reliably verified even if you
-use sampled network monitoring, for example, with sFlow.
+As was mentioned previously, the table above lists all unsolicited TCP
+connections that have completed three-way handshake. This prevents us from
+producing false-positive alerts. It is worth to note that we aren't closing the
+connection immediately after three-way handshake was completed, thus you should
+see communication from your sFlow monitoring. If you are using NetFlow or
+IPFIX, you should be able to see all four (4) flows. If you don't implement any
+of those, do not hesitate to ask us for more detailed logs.
 
-Please do not hesitate to reply to this letter if you have any questions or
-concerns regarding the current case.
-
-We also provide hourly feed of all detected malicious IP addresses here:
+If you are interested in more threat intelligence related to our detection of
+unsolicited connections, check out our hourly feed at the following URL:
 https://otx.alienvault.com/pulse/66794486bda6c3cf8823c604
 
 Kind regards,
 Network department
-Skhron.COM.UA
+Skhron
