@@ -1,27 +1,15 @@
 package querygeneric
 
 import (
-	"abuser/internal/queryerror"
 	"abuser/internal/queryrdap"
 	"abuser/internal/utils"
-	"errors"
 	"net/netip"
 )
 
-type BogonStatus struct {
-	IsBogonIP bool
-}
-
 // TODO: generate clarification why specific email address was added to further
 // embed this explanation into the abuse letter
-func IPAddrToAbuseC(ip netip.Addr) ([]string, BogonStatus) {
-	var bogonStatus = BogonStatus{}
-
-	emails, err := queryrdap.IPAddrToAbuseC(ip)
-
-	if errors.Is(err, queryerror.ErrBogonResource) {
-		bogonStatus.IsBogonIP = true
-	}
+func IPAddrToAbuseC(ip netip.Addr) []string {
+	emails := queryrdap.IPAddrToAbuseC(ip)
 
 	/* FIXME: fallback gets incorrect abuse-mailbox sometimes
 	if len(emails) == 0 {
@@ -37,5 +25,5 @@ func IPAddrToAbuseC(ip netip.Addr) ([]string, BogonStatus) {
 	*/
 
 	// remove duplicates
-	return utils.GetUnique(emails), bogonStatus
+	return utils.GetUnique(emails)
 }

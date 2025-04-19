@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 
 	l "abuser/internal/logger"
 )
@@ -42,7 +43,6 @@ func webhookCrowdsec(_ http.ResponseWriter, r *http.Request) {
 	utils.HandleCriticalError(err)
 
 	var abuseContacts []string
-	var bogonStatus querygeneric.BogonStatus
 
 	var tmplData structs.TemplateData[structs.PortscanEvent]
 	var tmpEvent structs.PortscanEvent
@@ -51,12 +51,7 @@ func webhookCrowdsec(_ http.ResponseWriter, r *http.Request) {
 		for _, item := range parsedBody {
 			ipAddr := utils.NormalizeIpAddr(item.Source.IP)
 
-			abuseContacts, bogonStatus = querygeneric.IPAddrToAbuseC(ipAddr)
-			if bogonStatus.IsBogonIP {
-				// TODO: handle bogons and report them accordingly
-				l.Logger.Printf("[%s] Bogon resource! Bogon reports are currently not implemented, skipping.\n", item.Source.IP)
-				return
-			}
+			abuseContacts = querygeneric.IPAddrToAbuseC(ipAddr)
 
 			tmplData = structs.TemplateData[structs.PortscanEvent]{IP: item.Source.IP, Events: nil}
 
@@ -79,6 +74,8 @@ func webhookCrowdsec(_ http.ResponseWriter, r *http.Request) {
 						break
 					case "destination_ip":
 						tmpEvent.DstIP = meta.Value
+						tmpEvent.DstIP = strings.ReplaceAll(tmpEvent.DstIP, ".", "x")
+						tmpEvent.DstIP = strings.ReplaceAll(tmpEvent.DstIP, ":", "x")
 						break
 					}
 				}

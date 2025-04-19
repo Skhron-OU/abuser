@@ -1,7 +1,6 @@
 package queryrdap
 
 import (
-	"abuser/internal/queryerror"
 	"abuser/internal/utils"
 	"bytes"
 	"fmt"
@@ -225,43 +224,55 @@ func isClientError(t rdap.ClientErrorType, err error) bool {
 	return false
 }
 
-func IPAddrToAbuseC(ip netip.Addr) ([]string, error) {
+func IPAddrToAbuseC(ipAddr netip.Addr) []string {
 	var err error
+	var ipStr string = ipAddr.String()
 	var ipMeta *rdap.IPNetwork
+	var abuseContacts = make(map[string]bool, 0)
 
 	client := &rdap.Client{UserAgent: "SkhronAbuseComplaintSender"}
 
+RecurseIPAddrToAbuseC:
 	retriesDone := 0
 	for ; retriesDone == 0 || (retriesDone < 10 && err != nil); retriesDone++ {
 		time.Sleep(time.Second * time.Duration(retriesDone*5))
 
-		ipMeta, err = client.QueryIP(ip.String())
-		if err != nil && isClientError(rdap.ObjectDoesNotExist, err) {
-			return nil, queryerror.ErrBogonResource
+		ipMeta, err = client.QueryIP(ipStr)
+		if err != nil &&
+			(isClientError(rdap.ObjectDoesNotExist, err) ||
+			isClientError(rdap.BootstrapNoMatch, err)) {
+			return nil
 		}
 	}
 
-	var abuseContacts = make(map[string]bool, 0)
-
 	if err == nil {
-		if ipMeta.Type == "ALLOCATED UNSPECIFIED" {
-			return nil, queryerror.ErrBogonResource
+		// FIXME: afrinic rdap does not return abuse-mailbox even if it
+		// is present, possible workaround is to query and parse whois
+		// instead
+		if ipMeta.Port43 == "whois.afrinic.net" {
+			return nil
+		}
+
+		if ipMeta.Type == "ALLOCATED UNSPECIFIED" || ipMeta.Type == "ALLOCATED-BY-RIR" {
+			return nil
 		}
 
 		metaProcessor(&abuseContacts, &ipMeta.Entities)
 
 		if len(abuseContacts) == 0 {
-			l.Logger.Printf("[%s] RDAP query failed: no abuse contacts found after %d tries\n", ip.String(), retriesDone)
+			if retriesDone > 1 {
+				l.Logger.Printf("[%s] RDAP query failed: no abuse contacts found after %d tries\n", ipStr, retriesDone)
+			}
 
-			// FIXME: implement recursive parent lookup
-			parentHandle := utils.NormalizeIpRange(ipMeta.ParentHandle)
-			if parentHandle != "" {
-				upperIpMeta, err := client.QueryIP(parentHandle)
-				if err == nil {
-					metaProcessor(&abuseContacts, &upperIpMeta.Entities)
-				} else {
-					l.Logger.Printf("[%s] parent network [%s] RDAP query failed: %s\n", ip.String(), parentHandle, err.Error())
+			if ipMeta.ParentHandle != "" {
+				ipStr = utils.NormalizeIpRange(ipMeta.ParentHandle)
+				if ipStr != "" {
+					goto RecurseIPAddrToAbuseC
 				}
+
+				// TODO: ARIN returns ParentHandle
+				// NET-x-x-x-x-x, alternate parent query method
+				// can be considered
 			}
 		} else {
 			if ipMeta.Country == "BR" { // they wish to receive copies of complaints
@@ -269,13 +280,13 @@ func IPAddrToAbuseC(ip netip.Addr) ([]string, error) {
 			}
 		}
 	} else {
-		l.Logger.Printf("[%s] RDAP query failed: %s\n", ip.String(), err.Error())
+		l.Logger.Printf("[%s] RDAP query failed: %s\n", ipStr, err.Error())
 	}
 
-	return utils.Keys(abuseContacts), nil
+	return utils.Keys(abuseContacts)
 }
 
-func AsnToAbuseC(asn uint) ([]string, error) {
+func AsnToAbuseC(asn uint) []string {
 	var err error
 	var asnMeta *rdap.Autnum
 
@@ -287,7 +298,7 @@ func AsnToAbuseC(asn uint) ([]string, error) {
 
 		asnMeta, err = client.QueryAutnum(strconv.Itoa(int(asn)))
 		if err != nil && isClientError(rdap.ObjectDoesNotExist, err) {
-			return nil, queryerror.ErrBogonResource
+			return nil
 		}
 	}
 
@@ -303,5 +314,5 @@ func AsnToAbuseC(asn uint) ([]string, error) {
 		l.Logger.Printf("[%d] RDAP query failed: %s\n", asn, err.Error())
 	}
 
-	return utils.Keys(abuseContacts), nil
+	return utils.Keys(abuseContacts)
 }
