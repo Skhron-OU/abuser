@@ -34,10 +34,6 @@ var reportMap = map[string]string{
 	"abuse@ovh.ca":  "web/ovh",
 	// TODO: develop XARF to remove this quirk
 	"abuse@digitalocean.com": "email/digitalocean",
-	// temporary, reach out apnic
-	"helpdesk@apnic.net": "blackhole",
-	// are ignoring portscan: "We cannot meaningfully process complaints about an IP simply looking at a port."
-	"abuse@lightedge.com": "blackhole",
 }
 
 func init() {
