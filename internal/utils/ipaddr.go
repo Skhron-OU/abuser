@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"math"
 	"net/netip"
+	"strconv"
 	"strings"
 )
 
@@ -37,10 +38,11 @@ func NormalizeIpRange(ipr string) string {
 	var mask int = 0
 	var maskDiff float64
 	if strings.Contains(ipr, " - ") {
-		rString = strings.Split(ipr, " - ")
+		if rString = strings.Split(ipr, " - "); len(rString) != 2 {
+			return ""
+		}
 
-		rStartA, err = netip.ParseAddr(rString[0])
-		if err != nil {
+		if rStartA, err = netip.ParseAddr(rString[0]); err != nil {
 			return ""
 		}
 
@@ -68,8 +70,25 @@ func NormalizeIpRange(ipr string) string {
 		}
 
 		mask = rStartA.BitLen() - mask
-		rPrefix, err = rStartA.Prefix(mask)
-		if err != nil {
+		if rPrefix, err = rStartA.Prefix(mask); err != nil {
+			return ""
+		} else {
+			return rPrefix.String()
+		}
+	} else if strings.Contains(ipr, "/") {
+		if rString = strings.Split(ipr, "/"); len(rString) != 2 {
+			return ""
+		}
+
+		if rStartA, err = netip.ParseAddr(rString[0]); err != nil {
+			return ""
+		}
+
+		if mask, err = strconv.Atoi(rString[1]); err != nil {
+			return ""
+		}
+
+		if rPrefix, err = rStartA.Prefix(mask); err != nil {
 			return ""
 		} else {
 			return rPrefix.String()
