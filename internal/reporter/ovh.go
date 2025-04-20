@@ -110,12 +110,7 @@ ovhRetry:
 			goto ovhError
 		}
 
-		if resJSON.Message != "Report successfully created" {
-			goto ovhError
-		} else {
-			l.Logger.Printf("[%s] OVH accepted abuse complaint\n", ip.String())
-		}
-
+		l.Logger.Printf("[%s] OVH accepted abuse complaint\n", ip.String())
 		return
 	}
 
