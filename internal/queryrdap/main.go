@@ -39,9 +39,8 @@ func nichdl(nichdlMap *map[string]bool, nichdlPath string) {
 		return
 	}
 
-	defer f.Close()
-
 	b, err := io.ReadAll(f)
+	utils.HandleCriticalError(err)
 
 	for _, entry := range bytes.Split(b, []byte("\n")) {
 		entry = bytes.TrimSpace(entry)
@@ -147,17 +146,14 @@ func processEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactT
 			if utils.Index(entity.Roles, "abuse") != -1 {
 				mailboxCollector(abuseContacts, entity.VCard.Properties, emailTypeAbuse)
 			}
-			break
 		case contactTypeAny:
 			/* no matter what entity role is, lookup abuse-mailbox */
 			mailboxCollector(abuseContacts, entity.VCard.Properties, emailTypeAbuse)
-			break
 		case contactTypeAbuseLoose:
 			/* lookup all emails from entity with role of abuse */
 			if utils.Index(entity.Roles, "abuse") != -1 {
 				mailboxCollector(abuseContacts, entity.VCard.Properties, emailTypeAny)
 			}
-			break
 		case emailTypeAny:
 		default:
 		}
@@ -181,9 +177,7 @@ func processEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactT
 					continue
 				}
 
-				if _, ok := (*abuseContacts)[invalidEmail]; ok {
-					delete((*abuseContacts), invalidEmail)
-				}
+				delete((*abuseContacts), invalidEmail)
 			}
 		}
 	}
@@ -205,7 +199,7 @@ func metaProcessor(abuseContacts *map[string]bool, entities *[]rdap.Entity) {
 				entity = q.PopFront()
 				processEntity(abuseContacts, entity, contactType)
 				for i := range entity.Entities {
-					q.PushBack(&(*&entity.Entities)[i])
+					q.PushBack(&(entity.Entities)[i])
 				}
 			}
 		} else {
@@ -226,7 +220,7 @@ func isClientError(t rdap.ClientErrorType, err error) bool {
 
 func IPAddrToAbuseC(ipAddr netip.Addr) []string {
 	var err error
-	var ipStr string = ipAddr.String()
+	var ipStr = ipAddr.String()
 	var ipMeta *rdap.IPNetwork
 	var abuseContacts = make(map[string]bool, 0)
 

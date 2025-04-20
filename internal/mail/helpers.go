@@ -30,14 +30,14 @@ func IsFatalSmtpError(smtpErr string) (bool, string) {
 	)
 
 	// RFC821, reply code (450, 550 etc.)
-	replyCode, _ := smtpResult["replyCode"]
+	replyCode := smtpResult["replyCode"]
 
 	// RFC3463, status code (2.1.23, 4.1.1 etc.)
-	rawStatusCode, _ := smtpResult["rawStatusCode"]
+	rawStatusCode := smtpResult["rawStatusCode"]
 
 	// human readable part, sometimes is nested SMTP error (i.e. postfix
 	// address verification)
-	reason, _ := smtpResult["reason"]
+	reason := smtpResult["reason"]
 
 	// nothing more to analyze
 	if len(rawStatusCode) == 0 {
@@ -53,9 +53,10 @@ func IsFatalSmtpError(smtpErr string) (bool, string) {
 
 	statusCode := strings.Split(rawStatusCode, ".")
 
-	if statusCode[0] == "5" {
+	switch statusCode[0] {
+	case "5":
 		return true, smtpErr
-	} else if statusCode[0] == "4" {
+	case "4":
 		if strings.Index(reason, postfixUnverifiedAddressErr) == 0 {
 			offset := len(postfixUnverifiedAddressErr)
 			smtpErr = reason[offset:]
@@ -65,7 +66,7 @@ func IsFatalSmtpError(smtpErr string) (bool, string) {
 			} else {
 				if regexpTcpErr.MatchString(smtpErr) {
 					smtpResult = utils.RegexpFindStringSubmatchMap(regexpTcpErr, smtpErr)
-					smtpErr, _ = smtpResult["reason"]
+					smtpErr = smtpResult["reason"]
 
 					return false, smtpErr
 				}

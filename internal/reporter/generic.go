@@ -120,7 +120,6 @@ func Report[T any](recipientsEmail []string, attacker netip.Addr, data structs.T
 			switch reportMethod {
 			case "web/ovh":
 				ToOVH(category, attacker, body, addrReplyToHeader)
-				break
 			// FIXME: "Don't repeat yourself"
 			case "email/digitalocean":
 				tmplCustomBody, prs := tmplMap["body.digitalocean"]
@@ -152,11 +151,9 @@ func Report[T any](recipientsEmail []string, attacker netip.Addr, data structs.T
 				email.Body = renderTemplate(tmplCustomBody, customDetails)
 
 				email.Send(emailCreds, 0)
-				break
 			case "blackhole":
 			default:
 				// just skip the blackholed address
-				break
 			}
 		} else {
 			// they will receive email letter

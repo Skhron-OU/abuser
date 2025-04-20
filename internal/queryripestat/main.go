@@ -244,7 +244,9 @@ func craftRequest(dataCall string, param map[string]string) ([]byte, error) {
 		}
 
 		*responseJSON, err = io.ReadAll(response.Body)
-		response.Body.Close()
+		utils.HandleCriticalError(err)
+
+		err = response.Body.Close()
 		utils.HandleCriticalError(err)
 
 		err = json.Unmarshal(*responseJSON, &responseAPI)

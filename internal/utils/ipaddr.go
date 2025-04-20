@@ -35,7 +35,7 @@ func NormalizeIpRange(ipr string) string {
 	var rStartA, rEndA netip.Addr
 	var rStartB, rEndB []byte
 	var rPrefix netip.Prefix
-	var mask int = 0
+	var mask = 0
 	var maskDiff float64
 	if strings.Contains(ipr, " - ") {
 		if rString = strings.Split(ipr, " - "); len(rString) != 2 {

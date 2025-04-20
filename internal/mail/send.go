@@ -128,6 +128,4 @@ func (email *Email) Send(creds SMTP, attempt uint) {
 	// appropriately end our communication with the server
 	err = smtpConn.Quit()
 	utils.HandleCriticalError(err)
-
-	tlsConn.Close()
 }
