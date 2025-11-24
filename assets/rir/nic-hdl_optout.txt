@@ -42,6 +42,7 @@ NETWO4028-ARIN
 XI5-AP
 ZM900-AP
 ct74-AP
+AA1875-AP
 
 # SecurityResearcher: networkabuse[]domaintools.com
 NETWO4008-ARIN
@@ -91,12 +92,36 @@ NNL3
 # AS208135, Public free wifi
 FLPK
 
+# OptOutRequest: abuse[]jiex.co.id
+IRT-CORE-ID
+
+# OptOutRequest: tpnet[]trespontas.com.br
+TPL188
+
+# OptOutRequest: abuse[]bangmodhosting.com, abuse[]bangmod.cloud
+# "The IP address can be blocked immediately if there is no connection"
+AP1157-AP
+AB1457-AP
+IRT-POP-BANGMOD-TH
+IRT-BANGMODCLOUD-SG
+
 # Tor
 ABUSE7315-ARIN
 
 # Proxy/VPN: abuse[]ovpn.com
 OIA19-RIPE
 AR50613-RIPE
+
+# Proxy/VPN: abuse[]mega.co.nz
+AR41189-RIPE
+
+# Proxy/VPN: abuse[]privadovpn.com
+PN5129-RIPE
+
+# Proxy/VPN: protonvpn[]protonmail.com, abuse.importer974[]passmail.net
+AO6108-RIPE
+AR63442-RIPE
+AR36957-RIPE
 
 # Unresponsive/inactive/broken abuse department
 AC30115-RIPE
@@ -122,7 +147,8 @@ AR16598-RIPE
 RA6664-RIPE
 # - abuse[]kmtn.ru
 KA4497-RIPE
-# - a.zorin[]ttk.ru, ripe[]sibir.ttk.ru, baykal_iptech[]baikal.ttk.ru, cous[]ural.ttk.ru
+# - a.zorin[]ttk.ru, ripe[]sibir.ttk.ru, baykal_iptech[]baikal.ttk.ru,
+# cous[]ural.ttk.ru
 AR63191-RIPE
 AR16923-RIPE
 BTTC-RIPE
@@ -195,3 +221,29 @@ IRT-IN-YOU
 
 # Other: info[]hostup.se
 GENER94-ARIN
+
+# Other: hm-changed[]vnnic.vn
+IRT-VNNIC-AP
+
+# Other: abuse[]indo.net.id
+# Questionable abuse processing practices: "We have already dropped the
+# source and destination."
+IRT-INDONET-ID
+
+# Other: abuse[]atlantisnet.com.tr
+# Questionable abuse processing practices: "We would like to inform you
+# that our customer using the relevant IP address is dropping port 445."
+AR45341-RIPE
+
+# Other: noc[]voeinternet.com.br
+# Questionable abuse processing practices: "we have accessed the
+# customer's CPE (router) and applied a firewall rule to drop all outbound
+# TCP traffic on port 23. This will effectively stop the reported scanner
+# activity at the source."
+NOVIN4
+
+# Other: csalex[]viainternet.net.br
+# Questionable abuse processing practices: "We applied an output filter on
+# the gateway (Datacom DM986-204) blocking TCP/23 and TCP/2323 (Telnet) to
+# any destination. The malicious traffic was stopped immediately."
+ACDSA660
