@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/netip"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -91,42 +90,6 @@ func processEntity(abuseContacts *map[string]bool, entity *rdap.Entity, contactT
 	// opt out specific contacts
 	if _, ok := nichdlOptOut[entity.Handle]; ok {
 		return
-	}
-
-	client := &rdap.Client{}
-
-	// do additional query for this entity if RIR didn't include contact details for some reason
-	if entity.VCard == nil && entity.Handle != "" {
-	EntityLinksLoop:
-		for _, link := range entity.Links {
-			if link.Rel == "self" {
-				entityUrl, err := url.Parse(link.Href)
-				if err != nil {
-					break
-				}
-
-				entityRequest := rdap.NewRawRequest(entityUrl)
-
-				entityResponse, retriesDone := (*rdap.Response)(nil), 0
-				for ; retriesDone == 0 || (retriesDone < 10 && err != nil); retriesDone++ {
-					time.Sleep(time.Second * time.Duration(retriesDone*5))
-
-					entityResponse, err = client.Do(entityRequest)
-					if err != nil && isClientError(rdap.ObjectDoesNotExist, err) {
-						l.Logger.Printf("%s", entityResponse.Object.(*rdap.Entity).DecodeData.String())
-						break EntityLinksLoop
-					}
-				}
-
-				if err != nil || entityResponse == nil {
-					l.Logger.Printf("[%s] RDAP query failed: no entity data found after %d tries because %s", entity.Handle, retriesDone, err.Error())
-					break
-				}
-
-				entity.VCard = entityResponse.Object.(*rdap.Entity).VCard
-				break
-			}
-		}
 	}
 
 	// skip invalid contacts
