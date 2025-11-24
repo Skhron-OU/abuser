@@ -79,7 +79,9 @@ func webhookCrowdsec(_ http.ResponseWriter, r *http.Request) {
 				tmplData.Events = append(tmplData.Events, tmpEvent)
 			}
 
-			reporter.Report(abuseContacts, ipAddr, tmplData, "portscan")
+			if len(tmplData.Events) > 0 {
+				reporter.Report(abuseContacts, ipAddr, tmplData, "portscan")
+			}
 		}
 	}()
 }
