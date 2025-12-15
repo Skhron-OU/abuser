@@ -5,11 +5,16 @@ import (
 	"abuser/internal/reporter"
 	"abuser/internal/structs"
 	"abuser/internal/utils"
+	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	l "abuser/internal/logger"
 )
@@ -87,9 +92,35 @@ func webhookCrowdsec(_ http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	l.Logger.Println("listening 127.0.0.1:8888")
+	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	http.HandleFunc("/webhook/crowdsec", webhookCrowdsec)
-	err := http.ListenAndServe("127.0.0.1:8888", nil) // #nosec G114
-	panic(err)
+
+	ongoingCtx, stopOngoingGracefully := context.WithCancel(context.Background())
+	server := &http.Server{
+		Addr: "127.0.0.1:8888",
+		BaseContext: func(_ net.Listener) context.Context {
+			return ongoingCtx
+		},
+	}
+
+	go func() {
+		l.Logger.Println("listening 127.0.0.1:8888")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			panic(err)
+		}
+	}()
+
+	<-rootCtx.Done()
+	stop()
+	reporter.Stop()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 4096 * time.Second)
+	defer cancel()
+	err := server.Shutdown(shutdownCtx)
+	stopOngoingGracefully()
+	if err != nil {
+		l.Logger.Println("Failed to wait for ongoing requests to finish, waiting for forced cancellation.")
+	}
 }

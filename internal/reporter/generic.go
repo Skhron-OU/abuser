@@ -25,6 +25,7 @@ type digitaloceanDetails[T any] struct {
 	Events    []T
 }
 
+var emailWorkerPool *mail.EmailWorkerPool
 var templateMap map[string]map[string]*template.Template
 
 // TODO: do not hardcode these?
@@ -67,6 +68,19 @@ func init() {
 			}
 		}
 	}
+
+	emailWorkerPool = mail.NewEmailWorkerPool(-1, mail.SMTP{
+		Helo: os.Getenv("SMTP_HELO"),
+		Host: os.Getenv("SMTP_HOST"),
+		User: os.Getenv("SMTP_USER"),
+		Pass: os.Getenv("SMTP_PASS"),
+		Port: 465,
+	})
+	emailWorkerPool.Start()
+}
+
+func Stop() {
+	emailWorkerPool.Stop()
 }
 
 func renderTemplate(tmpl *template.Template, data interface{}) string {
@@ -100,14 +114,6 @@ func Report[T any](recipientsEmail []string, attacker netip.Addr, data structs.T
 
 	title = renderTemplate(tmplTitle, data)
 	body = renderTemplate(tmplBody, data)
-
-	emailCreds := mail.SMTP{
-		Helo: os.Getenv("SMTP_HELO"),
-		Host: os.Getenv("SMTP_HOST"),
-		User: os.Getenv("SMTP_USER"),
-		Pass: os.Getenv("SMTP_PASS"),
-		Port: 465,
-	}
 
 	tmplAddrReplyTo, _ := template.New("").Parse(os.Getenv("SMTP_REPLYTO_TMPL"))
 	addrReplyToHeader := renderTemplate(tmplAddrReplyTo, struct{ HexID string }{HexID: utils.HexIpAddr(attacker)})
@@ -150,7 +156,7 @@ func Report[T any](recipientsEmail []string, attacker netip.Addr, data structs.T
 				}
 				email.Body = renderTemplate(tmplCustomBody, customDetails)
 
-				email.Send(emailCreds, 0)
+				emailWorkerPool.Submit(&email, 0)
 			case "blackhole":
 			default:
 				// just skip the blackholed address
@@ -183,6 +189,6 @@ func Report[T any](recipientsEmail []string, attacker netip.Addr, data structs.T
 		email.Headers["Subject"] = title
 		email.Body = body
 
-		email.Send(emailCreds, 0)
+		emailWorkerPool.Submit(&email, 0)
 	}
 }
